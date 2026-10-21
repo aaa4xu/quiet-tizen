@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+import tv
 from tv import check_identity, decode_pull, observed_firmware, parse_firmware, private_path, PROFILE
 
 
@@ -21,6 +22,16 @@ class AccessTests(unittest.TestCase):
             check_identity(PROFILE["model"], "ANOTHER_FIRMWARE")
         with self.assertRaises(ValueError):
             check_identity(PROFILE["model"], None)
+
+    def test_unsupported_model_is_refused_before_any_tv_command(self):
+        with patch("tv.SdbClient"), patch("tv.find_sdb"), \
+                patch("tv.observed_model", return_value="ANOTHER_MODEL"), \
+                patch("tv.observed_firmware") as firmware, \
+                patch("sys.argv", ["tv.py", "--host", "192.0.2.50", "exec", "--command", "true"]), \
+                patch("sys.stdout"):
+            with self.assertRaisesRegex(ValueError, "Unsupported model"):
+                tv.main()
+        firmware.assert_not_called()
 
     def test_firmware_is_read_from_product_info(self):
         prd_info = ("[Version]\nModel=T-EXAMPLE-0000;\nVersion=T-EXAMPLE-0000-1000.0;\n"
