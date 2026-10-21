@@ -53,9 +53,12 @@ def parse_firmware(prd_info):
     return match.group(1) if match else None
 
 
-def observed_firmware(client):
+def observed_firmware(client, callback_host=None):
     # The same string About This TV shows as Software Version; readable without root.
-    return parse_firmware(_capture(client, "cat /etc/prd_info.ini 2>/dev/null || true"))
+    # A truncated reply parses as "not detected", which the identity gate refuses.
+    result = client.capture("cat /etc/prd_info.ini 2>/dev/null || true",
+                            callback_host=callback_host, timeout=15)
+    return parse_firmware(result.output)
 
 
 def check_model(model):
@@ -140,7 +143,7 @@ def main():
     if args.action != "doctor":
         # Reading the firmware already runs a command on the TV; refuse other models first.
         check_model(model)
-    firmware = args.firmware or observed_firmware(client)
+    firmware = args.firmware or observed_firmware(client, args.callback_host)
     print("Firmware:", firmware or "not detected; must be read on the TV.")
     if args.action == "doctor":
         assessment = _check_target(client)

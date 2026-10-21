@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -45,9 +45,11 @@ class AccessTests(unittest.TestCase):
         self.assertEqual(parse_firmware(prd_info), "T-EXAMPLE-0000-1000.0")
         self.assertIsNone(parse_firmware("[Version]\nModel=T-EXAMPLE-0000;\n"))
         # A TV without the file must yield "unknown", not a failed SDB command.
-        with patch("tv._capture", return_value="") as capture:
-            self.assertIsNone(observed_firmware(object()))
-        command = capture.call_args.args[1].replace("/etc/prd_info.ini", "/nonexistent/prd_info.ini")
+        client = Mock()
+        client.capture.return_value.output = "\n[exit:0]\n"
+        self.assertIsNone(observed_firmware(client, "192.0.2.10"))
+        self.assertEqual(client.capture.call_args.kwargs["callback_host"], "192.0.2.10")
+        command = client.capture.call_args.args[0].replace("/etc/prd_info.ini", "/nonexistent/prd_info.ini")
         result = subprocess.run(["sh", "-c", command], capture_output=True)
         self.assertEqual((result.returncode, result.stdout), (0, b""))
 
