@@ -58,7 +58,7 @@ is read from `apps.json`; verify all app IDs against the TV. See
 
 ## Install without changing Home yet
 
-The tested native-app container is **`com.samsung.tv.bixby-promotion`**.
+On the U8000F the native-app container is **`com.samsung.tv.bixby-promotion`**.
 Its `BixbyPromotion.dll` is replaced with our assembly, while the package's
 existing identity, metadata and framework integration are retained. This
 replaces Bixby Promotion's function. It is not a store-signed standalone TPK.
@@ -66,6 +66,18 @@ replaces Bixby Promotion's function. It is not a store-signed standalone TPK.
 Inspect the installed package, its owner/labels, original entry assembly and
 current registry flags first. This release's recipe requires the observed
 owner `201:0`. If the layout differs, stop and adapt the profile.
+
+Another profile can name a different host in its `launcher` block. The
+QE65S95F profile uses `com.samsung.tv.adplayer` and `AdPlayer.dll`, because
+Bixby Promotion is not installed there. Append both values to the install
+command below and later to `restore-launcher.sh`, and use that app ID in the
+Home and startup commands. The settings-bridge recipes still target Bixby
+Promotion only.
+
+```sh
+tv exec --script recipes/install-launcher.sh --arg home-01 \
+  --arg com.samsung.tv.adplayer --arg AdPlayer.dll
+```
 
 ```sh
 tv exec --script recipes/snapshot.sh --arg home-01
