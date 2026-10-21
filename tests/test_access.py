@@ -15,7 +15,6 @@ from tv import check_identity, decode_pull, observed_firmware, parse_firmware, p
 
 class AccessTests(unittest.TestCase):
     def test_target_identity_gate(self):
-        self.assertGreater(len(PROFILES), 1)
         for profile in PROFILES:
             with self.subTest(model=profile["model"]):
                 check_identity(profile["model"], profile["firmware"])
@@ -25,9 +24,16 @@ class AccessTests(unittest.TestCase):
                     check_identity(profile["model"], "ANOTHER_FIRMWARE")
                 with self.assertRaises(ValueError):
                     check_identity(profile["model"], None)
-        first, second = PROFILES[:2]
-        with self.assertRaises(ValueError):
-            check_identity(first["model"], second["firmware"])
+
+    def test_one_models_firmware_never_unlocks_another(self):
+        builds = {(profile["model"], profile["firmware"]) for profile in PROFILES}
+        crossed = [(model, firmware) for model, _ in builds for other, firmware in builds
+                   if other != model and (model, firmware) not in builds]
+        self.assertTrue(crossed, "needs profiles for at least two models")
+        for model, firmware in crossed:
+            with self.subTest(model=model, firmware=firmware):
+                with self.assertRaises(ValueError):
+                    check_identity(model, firmware)
 
     def test_each_model_firmware_pair_has_one_profile(self):
         pairs = [(profile["model"], profile["firmware"]) for profile in PROFILES]
