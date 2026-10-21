@@ -23,6 +23,10 @@ test "$(stat -c %u:%g "$A/bin/$dll")" = 201:0
 test ! -e "$original"
 test ! -e "$A/res/quiet-home" # First install only; do not silently overwrite an existing custom launcher.
 test ! -e "$S/unpacked"
+# One registry row for the container, live and in the snapshot, before touching the package.
+for db in /opt/dbspace/.pkgmgr_parser.db "$D/.pkgmgr_parser.db"; do
+    test "$(sqlite3 -readonly "$db" "SELECT count(*) FROM package_app_info WHERE app_id='$container';")" = 1
+done
 # The archive is generated from our local build, not downloaded from an unknown party.
 mkdir "$S/unpacked"
 tar -xzf "$S/package.tar.gz" -C "$S/unpacked"
