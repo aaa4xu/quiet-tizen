@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit-target access for the documented U8000F profile. See docs/02-access.md."""
+"""Explicit-target access for TVs with a documented profile. See docs/02-access.md."""
 import argparse
 import asyncio
 import base64
@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "vendor"))
 from samsung_tv_root.archive_root import probe, _check_target, _capture
 from samsung_tv_root.sdb import SdbClient, find_sdb
 
-PROFILE = json.loads((ROOT / "profiles/un75u8000ffxza-1300.9.json").read_text())
+PROFILES = [json.loads(path.read_text()) for path in sorted((ROOT / "profiles").glob("*.json"))]
 STAGE = "/home/owner/share/tmp/sdk_tools/quiet-tizen"
 
 
@@ -62,7 +62,7 @@ def observed_firmware(client, callback_host=None):
 
 
 def check_model(model):
-    if model != PROFILE["model"]:
+    if not any(profile["model"] == model for profile in PROFILES):
         raise ValueError(f"Unsupported model {model!r}; stop and investigate a separate profile.")
 
 
@@ -71,8 +71,8 @@ def check_identity(model, firmware):
     if firmware is None:
         raise ValueError("Firmware not detected; supply --firmware with the exact Software Version "
                          "from About This TV. Do not guess this value.")
-    if firmware != PROFILE["firmware"]:
-        raise ValueError(f"Unsupported firmware {firmware!r}; only the documented build is accepted.")
+    if firmware not in [profile["firmware"] for profile in PROFILES if profile["model"] == model]:
+        raise ValueError(f"Unsupported firmware {firmware!r}; only a documented build is accepted.")
 
 
 def script_command(script, arguments):

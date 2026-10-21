@@ -10,18 +10,28 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import tv
-from tv import check_identity, decode_pull, observed_firmware, parse_firmware, private_path, script_command, PROFILE
+from tv import check_identity, decode_pull, observed_firmware, parse_firmware, private_path, script_command, PROFILES
 
 
 class AccessTests(unittest.TestCase):
     def test_target_identity_gate(self):
-        check_identity(PROFILE["model"], PROFILE["firmware"])
+        self.assertGreater(len(PROFILES), 1)
+        for profile in PROFILES:
+            with self.subTest(model=profile["model"]):
+                check_identity(profile["model"], profile["firmware"])
+                with self.assertRaises(ValueError):
+                    check_identity("ANOTHER_MODEL", profile["firmware"])
+                with self.assertRaises(ValueError):
+                    check_identity(profile["model"], "ANOTHER_FIRMWARE")
+                with self.assertRaises(ValueError):
+                    check_identity(profile["model"], None)
+        first, second = PROFILES[:2]
         with self.assertRaises(ValueError):
-            check_identity("ANOTHER_MODEL", PROFILE["firmware"])
-        with self.assertRaises(ValueError):
-            check_identity(PROFILE["model"], "ANOTHER_FIRMWARE")
-        with self.assertRaises(ValueError):
-            check_identity(PROFILE["model"], None)
+            check_identity(first["model"], second["firmware"])
+
+    def test_each_model_firmware_pair_has_one_profile(self):
+        pairs = [(profile["model"], profile["firmware"]) for profile in PROFILES]
+        self.assertEqual(len(pairs), len(set(pairs)))
 
     def test_script_reaches_shell_decoded_with_arguments(self):
         script = b'#!/bin/sh\nprintf "%s|" "$@"\n'
