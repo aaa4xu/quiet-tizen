@@ -61,9 +61,11 @@ def observed_firmware(client):
 def check_identity(model, firmware):
     if model != PROFILE["model"]:
         raise ValueError(f"Unsupported model {model!r}; stop and investigate a separate profile.")
+    if firmware is None:
+        raise ValueError("Firmware not detected; supply --firmware with the exact Software Version "
+                         "from About This TV. Do not guess this value.")
     if firmware != PROFILE["firmware"]:
-        raise ValueError("Supply --firmware with the exact version read from About This TV. "
-                         "Only the documented build is accepted. Do not guess this value.")
+        raise ValueError(f"Unsupported firmware {firmware!r}; only the documented build is accepted.")
 
 
 def pull_command(remote):
@@ -98,7 +100,8 @@ def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", required=True, help="The owner's TV IPv4 address; never auto-discovered")
-    parser.add_argument("--firmware", help="Operator-verified version from the TV's About screen")
+    parser.add_argument("--firmware", help="Software Version from About This TV; "
+                        "overrides the version the TV reports")
     parser.add_argument("--sdb", help="Path to Samsung's separately installed SDB")
     parser.add_argument("--callback-host", help="This computer's LAN IPv4 if route detection is wrong")
     sub = parser.add_subparsers(dest="action", required=True)
@@ -123,16 +126,17 @@ def main():
         os.environ["SDB"] = str(Path(args.sdb).expanduser().resolve())
     client = SdbClient(find_sdb(), args.host, timeout=15)
     model = observed_model(client)
+    firmware = args.firmware or observed_firmware(client)
     print("SDB model:", model)
+    print("Firmware:", firmware or "not detected; must be read on the TV.")
     if args.action == "doctor":
-        print("Firmware:", observed_firmware(client) or "not detected; must be read on the TV.")
         assessment = _check_target(client)
         print("Archive-route runtime family:", assessment.runtime)
         print(assessment.capabilities)
         print(_capture(client, "uname -srmo; readlink -f /usr/share/dotnet.tizen/netcoreapp"))
         print("Preflight only; root is not yet confirmed.")
         return
-    check_identity(model, args.firmware)
+    check_identity(model, firmware)
     if args.action == "push":
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,100}", args.name):
             raise ValueError("Use a simple staging filename without directory components.")
