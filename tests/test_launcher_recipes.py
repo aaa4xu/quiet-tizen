@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import subprocess
 import tempfile
 from pathlib import Path
 import unittest
@@ -55,6 +56,27 @@ class LauncherRegistryTests(unittest.TestCase):
         self.conn.rollback()
         self.assertEqual(self.rows(), [("unrelated.app", "true", "true", "true", "keep")])
 
+    def preflight_passes(self, recipe, first_change):
+        script = (ROOT / "recipes" / recipe).read_text()
+        block = re.search(r"^for db in .*?^done$", script, re.S | re.M)
+        self.assertLess(block.start(), script.index(first_change))  # nothing is changed before it
+        check = block.group(0).replace("/opt/dbspace/.pkgmgr_parser.db", str(self.directory / "live.db"))
+        check = check.replace("$container", CONTAINER)
+        return subprocess.run(["sh", "-euc", check], env={"D": str(self.directory), "PATH": "/usr/bin:/bin"},
+                              capture_output=True).returncode == 0
+
+    def test_container_row_is_checked_before_any_change(self):
+        for recipe, first_change in [("install-launcher.sh", 'mkdir "$S/unpacked"'),
+                                     ("restore-launcher.sh", '"$D/Probe.dll" set-home')]:
+            self.assertTrue(self.preflight_passes(recipe, first_change))
+            self.conn.execute(f"INSERT INTO package_app_info (app_id) VALUES ('{CONTAINER}')")
+            self.conn.commit()
+            self.assertFalse(self.preflight_passes(recipe, first_change))  # duplicate row
+            self.conn.execute(f"DELETE FROM package_app_info WHERE app_id='{CONTAINER}'")
+            self.conn.commit()
+            self.assertFalse(self.preflight_passes(recipe, first_change))  # missing row
+            self.conn.execute(f"INSERT INTO package_app_info VALUES ('{CONTAINER}','true','true','true','keep')")
+            self.conn.commit()
 
 if __name__ == "__main__":
     unittest.main()

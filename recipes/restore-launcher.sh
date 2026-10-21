@@ -19,6 +19,10 @@ test -s "$D/Probe.dll"
 test -s "$original/bin/$dll"
 test -s "$D/.pkgmgr_parser.db"
 sha256sum -c "$D/installed-home.sha256"
+# One registry row for the container, live and in the snapshot, before changing anything.
+for db in /opt/dbspace/.pkgmgr_parser.db "$D/.pkgmgr_parser.db"; do
+    test "$(sqlite3 -readonly "$db" "SELECT count(*) FROM package_app_info WHERE app_id='$container';")" = 1
+done
 /usr/bin/dotnet "$D/Probe.dll" set-home "$operation"
 vconftool set -f -t string db/appfw/home_appid "$home"
 vconftool set -f -t string db/appfw/startup_appid "$startup"
