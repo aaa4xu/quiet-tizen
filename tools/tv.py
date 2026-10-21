@@ -21,6 +21,7 @@ from samsung_tv_root.sdb import SdbClient, find_sdb
 
 PROFILES = [json.loads(path.read_text()) for path in sorted((ROOT / "profiles").glob("*.json"))]
 STAGE = "/home/owner/share/tmp/sdk_tools/quiet-tizen"
+AGENT_COMMAND_LIMIT = 64 * 1024  # MaximumCommandBytes in the TV-side root agent
 
 
 def private_path(path):
@@ -79,6 +80,15 @@ def script_command(script, arguments):
     # Base64 keeps the script intact through the command channel; decode it before sh reads it.
     encoded = base64.b64encode(script).decode()
     return f"printf '%s' {shlex.quote(encoded)} | base64 -d | /bin/sh -s -- " + shlex.join(arguments)
+
+
+def literal_command(text):
+    # The TV-side agent wraps the text in double quotes for sh -c and doubles every
+    # backslash, so a backslash typed here would reach the shell twice. Base64 keeps
+    # the wrapper free of backslashes; the decoded text is passed to a fresh sh -c,
+    # which then applies normal quoting, expansion and exit-status semantics.
+    encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    return f'/bin/sh -c "$(printf %s {encoded} | base64 -d)"'
 
 
 def pull_command(remote):
@@ -180,7 +190,10 @@ def main():
     else:
         if args.arg:
             raise ValueError("--arg requires --script.")
-        command = args.command
+        command = literal_command(args.command)
+        if len(command.encode("utf-8")) > AGENT_COMMAND_LIMIT:
+            raise ValueError("--command is too large for the root agent after encoding; "
+                             "use --script.")
     result = asyncio.run(probe(
         args.host, model=model, callback_host=args.callback_host,
         payloads=ROOT / ".local/build/payloads", commands=(command,), command_timeout=30,

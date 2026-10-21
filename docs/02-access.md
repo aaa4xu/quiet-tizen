@@ -82,6 +82,12 @@ compressed bytes and 32 MiB uncompressed, to stay within the upstream command
 output limit. Larger snapshots must be split or transferred with a separately
 reviewed tool; truncated output is never accepted.
 
+`exec --command` sends the text to the TV's shell unchanged: it is encoded on
+the computer, decoded on the TV and handed to a fresh `sh -c`, so quotes,
+`$`, backticks, backslashes and exit status behave as in a local `sh -c`. Use
+`--script` for anything longer than a line or two; a command that grows past
+the agent's 64 KiB frame after encoding is rejected and asks for `--script`.
+
 `exec --script` runs a reviewed script through the shell with optional repeated
 `--arg VALUE` positional arguments. There is a 30-second command budget; keep
 phases short. Logs are private and can contain device details. Do not attach

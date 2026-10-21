@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import tv
-from tv import check_identity, decode_pull, observed_firmware, parse_firmware, private_path, script_command, PROFILES
+from tv import check_identity, decode_pull, literal_command, observed_firmware, parse_firmware, private_path, script_command, PROFILES
 
 
 class AccessTests(unittest.TestCase):
@@ -44,6 +44,39 @@ class AccessTests(unittest.TestCase):
         command = script_command(script, ["home-01", "two words", "it's"])
         result = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
         self.assertEqual(result.stdout, b"home-01|two words|it's|")
+
+    def test_command_reaches_shell_with_its_own_quoting(self):
+        text = ("printf '%s\\n' hello\n"
+                "printf 'a\\tb\\n'\n"
+                "echo \"double=$HOME\"\n"
+                "echo 'single=$HOME'\n"
+                "echo \"escaped=\\$HOME\"\n")
+        command = literal_command(text)
+        # The agent doubles every backslash before sh sees the text; the wrapper has none.
+        self.assertNotIn("\\", command)
+        expected = subprocess.run(["sh", "-c", text], check=True, capture_output=True)
+        actual = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
+        self.assertEqual(actual.stdout, expected.stdout)
+
+    def test_command_wrapper_preserves_exit_status_and_stderr(self):
+        command = literal_command("printf 'out\\n'; printf 'err\\n' >&2; exit 7")
+        result = subprocess.run(["sh", "-c", command], capture_output=True)
+        self.assertEqual(result.returncode, 7)
+        self.assertEqual(result.stdout, b"out\n")
+        self.assertEqual(result.stderr, b"err\n")
+
+    def test_oversized_command_is_refused_before_the_root_session(self):
+        profile = PROFILES[0]
+        with patch("tv.SdbClient"), patch("tv.find_sdb"), \
+                patch("tv.observed_model", return_value=profile["model"]), \
+                patch("tv.observed_firmware", return_value=profile["firmware"]), \
+                patch("tv.probe") as probe, \
+                patch("sys.argv", ["tv.py", "--host", "192.0.2.50", "exec",
+                                   "--command", "x" * 60000]), \
+                patch("sys.stdout"):
+            with self.assertRaisesRegex(ValueError, "too large"):
+                tv.main()
+        probe.assert_not_called()
 
     def test_unsupported_model_is_refused_before_any_tv_command(self):
         with patch("tv.SdbClient"), patch("tv.find_sdb"), \

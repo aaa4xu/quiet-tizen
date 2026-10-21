@@ -210,7 +210,9 @@ def _stage(client: SdbClient, directory: Path, payloads: Path, package: str) -> 
     for name in PAYLOAD_FILES:
         source = payloads / name
         if not source.is_file():
-            raise ArchiveRootError(f"missing payload {source}; run make common-payload")
+            raise ArchiveRootError(
+                f"missing payload {source}; run python3 tools/build.py payloads"
+            )
         client.push(source, staging / name)
     for name in RUNTIME_CONFIG_FILES:
         client.push(directory / name, staging / name)
