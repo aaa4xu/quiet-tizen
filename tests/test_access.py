@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from tv import check_identity, decode_pull, private_path, script_command, PROFILE
+from tv import check_identity, decode_pull, observed_firmware, parse_firmware, private_path, script_command, PROFILE
 
 
 class AccessTests(unittest.TestCase):
@@ -27,6 +27,18 @@ class AccessTests(unittest.TestCase):
         command = script_command(script, ["home-01", "two words", "it's"])
         result = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
         self.assertEqual(result.stdout, b"home-01|two words|it's|")
+
+    def test_firmware_is_read_from_product_info(self):
+        prd_info = ("[Version]\nModel=T-EXAMPLE-0000;\nVersion=T-EXAMPLE-0000-1000.0;\n"
+                    "Build=EXAMPLE-RELEASE;\n\n[Build]\nDate=2026-01-01;\n")
+        self.assertEqual(parse_firmware(prd_info), "T-EXAMPLE-0000-1000.0")
+        self.assertIsNone(parse_firmware("[Version]\nModel=T-EXAMPLE-0000;\n"))
+        # A TV without the file must yield "unknown", not a failed SDB command.
+        with patch("tv._capture", return_value="") as capture:
+            self.assertIsNone(observed_firmware(object()))
+        command = capture.call_args.args[1].replace("/etc/prd_info.ini", "/nonexistent/prd_info.ini")
+        result = subprocess.run(["sh", "-c", command], capture_output=True)
+        self.assertEqual((result.returncode, result.stdout), (0, b""))
 
     def test_transfer_integrity(self):
         payload = b"synthetic contents only" * 100
