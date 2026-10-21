@@ -48,6 +48,16 @@ def observed_model(client):
     return rows[0][-1]
 
 
+def parse_firmware(prd_info):
+    match = re.search(r"^Version=([^;\s]+);?\s*$", prd_info, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def observed_firmware(client):
+    # The same string About This TV shows as Software Version; readable without root.
+    return parse_firmware(_capture(client, "cat /etc/prd_info.ini 2>/dev/null || true"))
+
+
 def check_identity(model, firmware):
     if model != PROFILE["model"]:
         raise ValueError(f"Unsupported model {model!r}; stop and investigate a separate profile.")
@@ -115,11 +125,12 @@ def main():
     model = observed_model(client)
     print("SDB model:", model)
     if args.action == "doctor":
+        print("Firmware:", observed_firmware(client) or "not detected; must be read on the TV.")
         assessment = _check_target(client)
         print("Archive-route runtime family:", assessment.runtime)
         print(assessment.capabilities)
         print(_capture(client, "uname -srmo; readlink -f /usr/share/dotnet.tizen/netcoreapp"))
-        print("Preflight only. Firmware must be read on the TV; root is not yet confirmed.")
+        print("Preflight only; root is not yet confirmed.")
         return
     check_identity(model, args.firmware)
     if args.action == "push":
