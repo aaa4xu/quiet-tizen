@@ -58,9 +58,13 @@ def observed_firmware(client):
     return parse_firmware(_capture(client, "cat /etc/prd_info.ini 2>/dev/null || true"))
 
 
-def check_identity(model, firmware):
+def check_model(model):
     if model != PROFILE["model"]:
         raise ValueError(f"Unsupported model {model!r}; stop and investigate a separate profile.")
+
+
+def check_identity(model, firmware):
+    check_model(model)
     if firmware is None:
         raise ValueError("Firmware not detected; supply --firmware with the exact Software Version "
                          "from About This TV. Do not guess this value.")
@@ -132,8 +136,11 @@ def main():
         os.environ["SDB"] = str(Path(args.sdb).expanduser().resolve())
     client = SdbClient(find_sdb(), args.host, timeout=15)
     model = observed_model(client)
-    firmware = args.firmware or observed_firmware(client)
     print("SDB model:", model)
+    if args.action != "doctor":
+        # Reading the firmware already runs a command on the TV; refuse other models first.
+        check_model(model)
+    firmware = args.firmware or observed_firmware(client)
     print("Firmware:", firmware or "not detected; must be read on the TV.")
     if args.action == "doctor":
         assessment = _check_target(client)
