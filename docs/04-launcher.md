@@ -67,24 +67,26 @@ Inspect the installed package, its owner/labels, original entry assembly and
 current registry flags first. This release's recipe requires the observed
 owner `201:0`. If the layout differs, stop and adapt the profile.
 
-Another profile can name a different host in its `launcher` block. The
-QE65S95F profile uses `com.samsung.tv.adplayer` and `AdPlayer.dll`, because
-Bixby Promotion is not installed there. Append both values to the install
-command below and later to `restore-launcher.sh`, and use that app ID in the
-Home and startup commands. The settings-bridge recipes still target Bixby
-Promotion only.
-
-```sh
-tv exec --script recipes/install-launcher.sh --arg home-01 \
-  --arg com.samsung.tv.adplayer --arg AdPlayer.dll
-```
-
 ```sh
 tv exec --script recipes/snapshot.sh --arg home-01
 tar -czf .local/package.tar.gz -C .local/package .
 tv push .local/package.tar.gz package.tar.gz
 tv exec --script recipes/install-launcher.sh --arg home-01
 ```
+
+Another profile can name a different host in its `launcher` block. The
+QE65S95F profile uses `com.samsung.tv.adplayer` and `AdPlayer.dll`, because
+Bixby Promotion is not installed there. Append both values to the last
+command above, so it becomes:
+
+```sh
+tv exec --script recipes/install-launcher.sh --arg home-01 \
+  --arg com.samsung.tv.adplayer --arg AdPlayer.dll
+```
+
+Append them later to `restore-launcher.sh` as well, and use that app ID in the
+Home and startup commands. The settings-bridge recipes still target Bixby
+Promotion only.
 
 The recipe backs up the original package before replacing the assembly,
 moves the cached native image out of the execution path, installs resources,
