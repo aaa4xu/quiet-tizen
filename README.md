@@ -45,6 +45,7 @@ cleanup compatibility.
 | [Cleanup profile](profiles/un75u8000ffxza-1300.9.json) | Separately selectable advertising, voice, context, smart-extras, sidebar and TV Plus groups |
 | [Cleanup planner](tools/plan_cleanup.py) | Field-specific apply/restore SQL generated from your own fresh snapshot |
 | [Access helper](tools/tv.py) | Explicit-target SDB preflight, temporary authenticated root, bounded transfers and session cleanup checks |
+| [WLED helper](tools/wled.py) | Dependency-free strip control over the HTTP API, WebSocket live view and DDP/DRGB realtime senders |
 | [Recipes](recipes) | Snapshot, stop-marker, launcher, settings-bridge and restoration scripts |
 | [Evidence](evidence/observations.json) | Sanitized observations and the limits of what was verified |
 
