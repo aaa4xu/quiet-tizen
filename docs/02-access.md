@@ -31,6 +31,12 @@ On the tested TV: open Smart Hub → Apps, focus App Settings, and enter
 computer's LAN IP as Host PC IP, and restart the TV. The exact screen and
 number-entry method vary by remote and firmware.
 
+On a compact Samsung Smart Remote without physical number keys, press its
+`123`/Number or combined Settings/Number/Color button while App Settings is
+open. If a row of shortcuts appears, select `123`, then use the directional
+pad and Select button to enter `1`, `2`, `3`, `4`, `5`; choose Done if shown.
+Samsung documents the [on-screen number pad](https://developer.samsung.com/smarttv/design/input-methods.html).
+
 Samsung documents the general workflow in
 [TV Device](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html).
 The computer and TV must be able to reach each other on the local network.
