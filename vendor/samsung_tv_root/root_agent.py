@@ -92,7 +92,7 @@ def decode_secret(value: str) -> bytes:
 
 
 def read_secret(path: Path) -> bytes:
-    return decode_secret(path.read_text())
+    return decode_secret(path.read_text(encoding="ascii"))
 
 
 def write_secret(path: Path, secret: bytes) -> None:

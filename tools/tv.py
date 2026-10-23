@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "vendor"))
 from samsung_tv_root.archive_root import probe, _check_target, _capture
 from samsung_tv_root.sdb import SdbClient, find_sdb
 
-PROFILES = [json.loads(path.read_text()) for path in sorted((ROOT / "profiles").glob("*.json"))]
+PROFILES = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((ROOT / "profiles").glob("*.json"))]
 STAGE = "/home/owner/share/tmp/sdk_tools/quiet-tizen"
 AGENT_COMMAND_LIMIT = 64 * 1024  # MaximumCommandBytes in the TV-side root agent
 

@@ -26,7 +26,7 @@ def main():
         for name in ("Tizen.NUI", "Tizen.Applications.Common", "Tizen.System", "Tizen"):
             if not (args.framework / f"{name}.dll").is_file():
                 parser.error(f"Missing {name}.dll. Read docs/04-launcher.md; these are not bundled.")
-        launcher = json.loads(args.profile.read_text())["launcher"]
+        launcher = json.loads(args.profile.read_text(encoding="utf-8"))["launcher"]
         home_dll = launcher["dll"]
         common = [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}", f"-p:QuietHomeAppId={launcher['app_id']}"]
         jobs.append((ROOT / "launcher/src/Home.csproj", "Home", "Home",

@@ -92,7 +92,7 @@ def main():
         p.error("Plans contain private rollback state; write them below this checkout's .local/.")
     if out.exists():
         p.error("Output directory already exists; preserve previous rollback records.")
-    profile = json.loads(args.profile.read_text())
+    profile = json.loads(args.profile.read_text(encoding="utf-8"))
     ids = []
     for group in args.groups:
         if group not in profile["groups"]:
@@ -108,7 +108,7 @@ def main():
         (out / f"{action}.sh").write_text(make_shell(sql), encoding="utf-8", newline="\n")
     manifest = {"model": profile["model"], "firmware": profile["firmware"], "groups": args.groups,
                 "apps": [{"app_id": app, **dict(zip(FIELDS, vals))} for app, vals in rows]}
-    (out / "before.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (out / "before.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"Generated {len(rows)} targeted changes and inverse operations in {out.relative_to(ROOT)}.")
     print("Review apply.sql and restore.sql. Preserve the snapshot and an on-TV copy of the restore script.")
     print("These plans only edit registry flags; markers, running apps and preferences are separate phases.")

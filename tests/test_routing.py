@@ -28,7 +28,7 @@ class RoutingTests(unittest.TestCase):
         self.temp.cleanup()
 
     def sql(self, recipe):
-        script = (ROOT / "recipes" / recipe).read_text()
+        script = (ROOT / "recipes" / recipe).read_text(encoding="utf-8")
         sql = re.search(r"<<SQL\n(.*?)\nSQL", script, re.S).group(1)
         return sql.replace("$D", str(self.directory))
 

@@ -96,14 +96,14 @@ def main():
     select.add_argument("--all", action="store_true")
     select.add_argument("--app", action="append", help="Exact app name; repeat as needed")
     args = p.parse_args()
-    entries = json.loads((ROOT / "launcher/artwork-sources.json").read_text())["apps"]
+    entries = json.loads((ROOT / "launcher/artwork-sources.json").read_text(encoding="utf-8"))["apps"]
     names = {entry["name"] for entry in entries}
     if args.app and set(args.app) - names:
         p.error("Unknown app name: " + ", ".join(sorted(set(args.app) - names)))
     local = ASSETS / "apps.local.json"
-    catalog = json.loads((local if local.exists() else ASSETS / "apps.json").read_text())
+    catalog = json.loads((local if local.exists() else ASSETS / "apps.json").read_text(encoding="utf-8"))
     receipts_path = ROOT / ".local/artwork-receipts.json"
-    receipts = json.loads(receipts_path.read_text()) if receipts_path.exists() else {}
+    receipts = json.loads(receipts_path.read_text(encoding="utf-8")) if receipts_path.exists() else {}
     failures = []
     for entry in entries:
         if not args.all and entry["name"] not in args.app:
@@ -131,9 +131,9 @@ def main():
         except Exception as error:
             failures.append(entry["name"])
             print(f"{entry['name']}: {error}; previous catalog artwork retained.")
-    local.write_text(json.dumps(catalog, indent=2) + "\n")
+    local.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     receipts_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    receipts_path.write_text(json.dumps(receipts, indent=2) + "\n")
+    receipts_path.write_text(json.dumps(receipts, indent=2) + "\n", encoding="utf-8")
     if failures:
         raise SystemExit(1)
     print("Local artwork catalog saved. Review it, then rebuild the launcher package.")

@@ -14,7 +14,7 @@ from tv_side import runs_on_tv
 
 class PackageTests(unittest.TestCase):
     def test_catalog_assets_exist_and_ids_are_unique(self):
-        catalog = json.loads((ROOT / "launcher/assets/apps.json").read_text())
+        catalog = json.loads((ROOT / "launcher/assets/apps.json").read_text(encoding="utf-8"))
         self.assertEqual(len({a["Id"] for a in catalog}), len(catalog))
         for entry in catalog:
             asset = entry["Asset"]
@@ -25,7 +25,7 @@ class PackageTests(unittest.TestCase):
     def test_profiles_have_no_duplicate_app_ids_or_essential_containers(self):
         for path in sorted((ROOT / "profiles").glob("*.json")):
             with self.subTest(profile=path.name):
-                profile = json.loads(path.read_text())
+                profile = json.loads(path.read_text(encoding="utf-8"))
                 ids = [app for group in profile.get("groups", {}).values() for app in group["app_ids"]]
                 self.assertEqual(len(ids), len(set(ids)))
                 essentials = ["org.tizen.menu", "com.samsung.tv.quicklaunch"]

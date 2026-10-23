@@ -31,7 +31,7 @@ class LauncherRegistryTests(unittest.TestCase):
         self.temp.cleanup()
 
     def sql(self, recipe):
-        script = (ROOT / "recipes" / recipe).read_text()
+        script = (ROOT / "recipes" / recipe).read_text(encoding="utf-8")
         sql = re.search(r"<<SQL\n(.*?)\nSQL", script, re.S).group(1)
         sql = sql.replace("$D", str(self.directory)).replace("$container", CONTAINER)
         self.assertNotIn("$", sql)  # every shell variable in the SQL is accounted for
@@ -59,7 +59,7 @@ class LauncherRegistryTests(unittest.TestCase):
         self.assertEqual(self.rows(), [("unrelated.app", "true", "true", "true", "keep")])
 
     def preflight_passes(self, recipe, first_change):
-        script = (ROOT / "recipes" / recipe).read_text()
+        script = (ROOT / "recipes" / recipe).read_text(encoding="utf-8")
         block = re.search(r"^for db in .*?^done$", script, re.S | re.M)
         self.assertLess(block.start(), script.index(first_change))  # nothing is changed before it
         check = block.group(0).replace("/opt/dbspace/.pkgmgr_parser.db", str(self.directory / "live.db"))
