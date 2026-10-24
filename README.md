@@ -69,10 +69,21 @@ Root access is reacquired from the computer when maintenance requires it.
 | App preloading | Vendor refreshes can restore the preference; no permanent enforcement daemon |
 | Netflix | More available memory after closing background apps; perceived input lag **not yet confirmed fixed** |
 
-The native launcher and underlying techniques were exercised on that TV.
-The **generalized scripts in this public release were checked locally and
-compiled where applicable; they have not been replayed end-to-end on a second
-TV**. This matters especially for private Samsung APIs and registry schemas.
+### Additional root-route result
+
+A temporary SDB/archive-launcher root session was also demonstrated on a
+Samsung `QN55S90FAFXZA`, firmware `T-RSMFAKUC-0090-1301.0` (Linux 5.4.261,
+aarch64, .NET 6.0.9). The TV authenticated the temporary agent as UID/EUID 0.
+This confirms that the archive route is possible on this exact reported
+build; it does not qualify the U8000F cleanup profile, a launcher installation,
+or other S90F firmware. Full reboot/standby and restoration validation were
+not part of this root-route report. See the [sanitized S90F evidence](evidence/s90f-root.json).
+
+On the U8000F, the native launcher and underlying techniques were exercised
+on the TV. The **generalized scripts in this public release were checked
+locally and compiled where applicable; they have not been replayed
+end-to-end on a second TV**. The S90F result above is limited to temporary
+root access; it does not validate those scripts there.
 
 ## Walkthrough
 
