@@ -1,0 +1,13 @@
+{
+  "profile_version": 1,
+  "model": "QN75QN85DDFXZA",
+  "firmware": "T-PTMDAKUC-0090-2130.0",
+  "os": "Tizen 9.0.0",
+  "kernel": "Linux 5.4.249 armv7l",
+  "runtime": "6.0.9",
+  "registry": "/opt/dbspace/.pkgmgr_parser.db",
+  "launcher": {
+    "app_id": "com.samsung.tv.bixby-promotion",
+    "dll": "BixbyPromotion.dll"
+  }
+}
