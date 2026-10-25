@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 import unittest
+from contextlib import closing
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINER = "example.quiet-home-host"
@@ -21,7 +22,7 @@ class LauncherRegistryTests(unittest.TestCase):
             ('{CONTAINER}','true','true','true','keep'),
             ('unrelated.app','true','true','true','keep');
         """)
-        with sqlite3.connect(self.directory / ".pkgmgr_parser.db") as snapshot:
+        with closing(sqlite3.connect(self.directory / ".pkgmgr_parser.db")) as snapshot:
             self.conn.backup(snapshot)
 
     def tearDown(self):
