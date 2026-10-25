@@ -104,8 +104,8 @@ def main():
     out.mkdir(parents=True, mode=0o700)
     for action in ("apply", "restore"):
         sql = make_sql(rows, restore=action == "restore")
-        (out / f"{action}.sql").write_text(sql)
-        (out / f"{action}.sh").write_text(make_shell(sql))
+        (out / f"{action}.sql").write_text(sql, encoding="utf-8", newline="\n")
+        (out / f"{action}.sh").write_text(make_shell(sql), encoding="utf-8", newline="\n")
     manifest = {"model": profile["model"], "firmware": profile["firmware"], "groups": args.groups,
                 "apps": [{"app_id": app, **dict(zip(FIELDS, vals))} for app, vals in rows]}
     (out / "before.json").write_text(json.dumps(manifest, indent=2) + "\n")
