@@ -108,7 +108,9 @@ records stay under ignored paths.
 Host tools use Python 3.12+ and the standard library. Raster artwork conversion
 optionally uses Pillow. Source builds use the .NET 6 SDK to match the tested
 TV; it is an older SDK and should be isolated from unrelated projects.
-Install Samsung's SDB separately.
+Install Samsung's SDB separately. With Nix, `nix develop` provides Python with
+Pillow, the .NET 6 SDK, OpenSSL and sqlite3, and uses an SDB kept at
+`.local/sdb/data/tools/sdb`.
 
 ```sh
 python3 -m unittest discover -s tests -v
