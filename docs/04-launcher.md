@@ -160,6 +160,11 @@ The recipe selects semantic keys and checks the saved values. It does not
 copy another TV's row numbers. It notifies
 `memory/appfw/app_context_db_change` after the transaction.
 
+The recipe expects exactly one row for each rule. A QN75QN85DDFXZA on
+`T-PTMDAKUC-0090-2130.0` has **two** `com.samsung.tv.quicklaunch` /
+`XF86More` rows, so the recipe stops there before changing anything. Count
+the rows on your TV first; this release has no recipe for a duplicated rule.
+
 Test both settings buttons, then generate/apply the **`light-shell`** cleanup
 group from the `shell-01` registry snapshot. That disables the native sidebar
 and browser. Keep the QuickLaunch bridge and `org.tizen.menu` enabled.
