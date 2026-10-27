@@ -130,6 +130,14 @@ restart with the remote. Check full boot, the Home button, standby/wake
 and return from a streaming app separately. Automatic startup was verified
 on the original TV; an OS update can change routing.
 
+On a QN75QN85DDFXZA with all three selectors assigned, the first full
+restart left the screen black for over 30 seconds until Home was pressed,
+although the launcher process had started during boot. With **Auto Open
+Last App** turned on and **Autorun Samsung TV Plus** turned off in Start
+Screen Options (**Start with Smart Hub Home** stayed on), the next restart
+and a standby/wake opened Quiet Home without pressing Home. Both settings
+were changed together, so which one mattered is unknown.
+
 ## Replace the slow settings/sidebar path
 
 The quick settings page handles volume, mute, brightness, Game Mode and
