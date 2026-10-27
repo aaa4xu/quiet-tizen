@@ -22,8 +22,19 @@ Find the paths on the target:
 tv exec --command 'find /usr/share/dotnet.tizen -name Tizen.NUI.dll -o -name Tizen.Applications.Common.dll -o -name Tizen.System.dll -o -name Tizen.dll'
 ```
 
-Inspect the results and pull the four matching runtime assemblies individually
-with `tv pull REMOTE_PATH .local/tv-framework/NAME.dll`. Do not use a random
+Inspect the results. When all four runtime assemblies are in one directory
+(`/usr/share/dotnet.tizen/framework` by default), pull them in one root
+session:
+
+```sh
+tv framework-pull --from /usr/share/dotnet.tizen/framework
+```
+
+It verifies each file's SHA-256 against the TV, writes nothing unless all
+four transfers verify, and refuses to replace a copy already in
+`.local/tv-framework/`. If the assemblies are spread over several
+directories, pull them individually with
+`tv pull REMOTE_PATH .local/tv-framework/NAME.dll`. Do not use a random
 desktop/mobile SDK version just because it has a file with the same name.
 Do not commit the resulting assemblies.
 

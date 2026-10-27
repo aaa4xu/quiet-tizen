@@ -22,6 +22,9 @@ from samsung_tv_root.sdb import SdbClient, find_sdb
 PROFILES = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((ROOT / "profiles").glob("*.json"))]
 STAGE = "/home/owner/share/tmp/sdk_tools/quiet-tizen"
 AGENT_COMMAND_LIMIT = 64 * 1024  # MaximumCommandBytes in the TV-side root agent
+# The four private references tools/build.py compiles Quiet Home against.
+FRAMEWORK = ("Tizen.NUI.dll", "Tizen.Applications.Common.dll", "Tizen.System.dll", "Tizen.dll")
+FRAMEWORK_DIR = "/usr/share/dotnet.tizen/framework"
 
 
 def private_path(path):
@@ -108,6 +111,17 @@ base64 "$t"
 """
 
 
+def framework_pull_plan(source, destination):
+    """Pair each reference's TV path with its private copy; never replace an earlier copy."""
+    if not source.startswith("/") or "\0" in source or "\n" in source:
+        raise ValueError("Use an absolute, single-line TV directory.")
+    plan = [(str(PurePosixPath(source) / name), private_path(Path(destination) / name)) for name in FRAMEWORK]
+    existing = [str(local) for _, local in plan if local.exists()]
+    if existing:
+        raise ValueError(f"Already pulled: {', '.join(existing)}. Inspect and move them aside first.")
+    return plan
+
+
 def decode_pull(stdout):
     digest, encoded = stdout.split("\n", 1)
     if not re.fullmatch(r"[0-9a-f]{64}", digest):
@@ -138,6 +152,12 @@ def main():
     pull = sub.add_parser("pull", help="Read and verify one bounded file into ignored .local/")
     pull.add_argument("remote")
     pull.add_argument("local", type=Path)
+    framework = sub.add_parser("framework-pull", help="Read and verify the four Tizen reference "
+                               "assemblies the launcher build needs into ignored .local/")
+    framework.add_argument("--from", dest="source", default=FRAMEWORK_DIR,
+                           help="TV directory holding all four; check it with find first")
+    framework.add_argument("--to", dest="destination", type=Path, default=ROOT / ".local/tv-framework",
+                           help="Private directory inside .local/ for the copies")
     push = sub.add_parser("push", help="Upload one file to the SDK staging directory, not to system paths")
     push.add_argument("local", type=Path)
     push.add_argument("name", help="Simple staging filename")
@@ -178,10 +198,13 @@ def main():
         print(f"Verified staging file: {remote}. Remove it after deployment.")
         return
     if args.action == "root-check":
-        command = "id"
+        commands = ("id",)
     elif args.action == "pull":
         private_path(args.local)
-        command = pull_command(args.remote)
+        commands = (pull_command(args.remote),)
+    elif args.action == "framework-pull":
+        plan = framework_pull_plan(args.source, args.destination)
+        commands = tuple(pull_command(remote) for remote, _ in plan)
     elif args.script:
         script = args.script.read_bytes()
         if len(script) > 45000:
@@ -196,17 +219,17 @@ def main():
                 "line endings (set the editor's line endings to LF, or run dos2unix on it), "
                 "review it and run it again. Files under recipes/ are checked out with LF "
                 "by .gitattributes; re-checkout them if they were cloned before that rule.")
-        command = script_command(script, args.arg)
+        commands = (script_command(script, args.arg),)
     else:
         if args.arg:
             raise ValueError("--arg requires --script.")
-        command = literal_command(args.command)
-        if len(command.encode("utf-8")) > AGENT_COMMAND_LIMIT:
+        commands = (literal_command(args.command),)
+        if len(commands[0].encode("utf-8")) > AGENT_COMMAND_LIMIT:
             raise ValueError("--command is too large for the root agent after encoding; "
                              "use --script.")
     result = asyncio.run(probe(
         args.host, model=model, callback_host=args.callback_host,
-        payloads=ROOT / ".local/build/payloads", commands=(command,), command_timeout=30,
+        payloads=ROOT / ".local/build/payloads", commands=commands, command_timeout=30,
     ))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     log = ROOT / ".local/sessions" / f"{stamp}.json"
@@ -215,13 +238,24 @@ def main():
         raise ValueError("The callback did not prove UID/EUID 0.")
     if not result.get("system_files_unchanged") or not result.get("staging_cleaned"):
         raise ValueError("Root session cleanup checks failed; inspect the private session log.")
+    if len(result.get("commands", [])) != len(commands):
+        raise RuntimeError(f"Not every command ran. Private log: {log.relative_to(ROOT)}")
+    for number, response in enumerate(result["commands"], 1):
+        if response["stderr"]:
+            print(response["stderr"], file=sys.stderr, end="")
+        if response["exit_code"] or response["timed_out"]:
+            label = "Command" if len(commands) == 1 else f"Command {number} of {len(commands)}"
+            raise RuntimeError(f"{label} failed ({response['exit_code']}, timeout={response['timed_out']}). "
+                               f"Private log: {log.relative_to(ROOT)}")
     response = result["commands"][0]
-    if response["stderr"]:
-        print(response["stderr"], file=sys.stderr, end="")
-    if response["exit_code"] or response["timed_out"]:
-        raise RuntimeError(f"Command failed ({response['exit_code']}, timeout={response['timed_out']}). "
-                           f"Private log: {log.relative_to(ROOT)}")
-    if args.action == "pull":
+    if args.action == "framework-pull":
+        # Verify every transfer before writing any, so a failure leaves no partial set.
+        files = [(local, decode_pull(response["stdout"]))
+                 for (_, local), response in zip(plan, result["commands"])]
+        for local, data in files:
+            save_private(local, data)
+        print(f"Verified {len(files)} references saved in {args.destination}.")
+    elif args.action == "pull":
         save_private(args.local, decode_pull(response["stdout"]))
         print("Verified file saved inside .local/.")
     else:
