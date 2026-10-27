@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import tv
 from tv import check_identity, decode_pull, literal_command, observed_firmware, parse_firmware, private_path, script_command, PROFILES
+from tv_side import runs_on_tv
 
 
 class AccessTests(unittest.TestCase):
@@ -40,12 +41,14 @@ class AccessTests(unittest.TestCase):
         pairs = [(profile["model"], profile["firmware"]) for profile in PROFILES]
         self.assertEqual(len(pairs), len(set(pairs)))
 
+    @runs_on_tv
     def test_script_reaches_shell_decoded_with_arguments(self):
         script = b'#!/bin/sh\nprintf "%s|" "$@"\n'
         command = script_command(script, ["home-01", "two words", "it's"])
         result = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
         self.assertEqual(result.stdout, b"home-01|two words|it's|")
 
+    @runs_on_tv
     def test_command_reaches_shell_with_its_own_quoting(self):
         text = ("printf '%s\\n' hello\n"
                 "printf 'a\\tb\\n'\n"
@@ -59,6 +62,7 @@ class AccessTests(unittest.TestCase):
         actual = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
         self.assertEqual(actual.stdout, expected.stdout)
 
+    @runs_on_tv
     def test_command_wrapper_preserves_exit_status_and_stderr(self):
         command = literal_command("printf 'out\\n'; printf 'err\\n' >&2; exit 7")
         result = subprocess.run(["sh", "-c", command], capture_output=True)
@@ -109,11 +113,17 @@ class AccessTests(unittest.TestCase):
                     "Build=EXAMPLE-RELEASE;\n\n[Build]\nDate=2026-01-01;\n")
         self.assertEqual(parse_firmware(prd_info), "T-EXAMPLE-0000-1000.0")
         self.assertIsNone(parse_firmware("[Version]\nModel=T-EXAMPLE-0000;\n"))
-        # A TV without the file must yield "unknown", not a failed SDB command.
         client = Mock()
         client.capture.return_value.output = "\n[exit:0]\n"
         self.assertIsNone(observed_firmware(client, "192.0.2.10"))
         self.assertEqual(client.capture.call_args.kwargs["callback_host"], "192.0.2.10")
+
+    @runs_on_tv
+    def test_firmware_read_succeeds_without_product_info(self):
+        # A TV without the file must yield "unknown", not a failed SDB command.
+        client = Mock()
+        client.capture.return_value.output = "\n[exit:0]\n"
+        observed_firmware(client, "192.0.2.10")
         command = client.capture.call_args.args[0].replace("/etc/prd_info.ini", "/nonexistent/prd_info.ini")
         result = subprocess.run(["sh", "-c", command], capture_output=True)
         self.assertEqual((result.returncode, result.stdout), (0, b""))

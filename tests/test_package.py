@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from fetch_artwork import convert, destination
+from tv_side import runs_on_tv
 
 
 class PackageTests(unittest.TestCase):
@@ -36,6 +37,7 @@ class PackageTests(unittest.TestCase):
                 for essential in essentials:
                     self.assertNotIn(essential, ids)
 
+    @runs_on_tv
     def test_shell_syntax(self):
         for path in (ROOT / "recipes").glob("*.sh"):
             subprocess.run(["sh", "-n", str(path)], check=True, capture_output=True)

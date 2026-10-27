@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from contextlib import closing
+from tv_side import runs_on_tv
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINER = "example.quiet-home-host"
@@ -66,6 +67,7 @@ class LauncherRegistryTests(unittest.TestCase):
         return subprocess.run(["sh", "-euc", check], env={"D": str(self.directory), "PATH": "/usr/bin:/bin"},
                               capture_output=True).returncode == 0
 
+    @runs_on_tv
     def test_container_row_is_checked_before_any_change(self):
         for recipe, first_change in [("install-launcher.sh", 'mkdir "$S/unpacked"'),
                                      ("restore-launcher.sh", '"$D/Probe.dll" set-home')]:
