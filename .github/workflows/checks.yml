@@ -13,13 +13,14 @@ jobs:
         os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/setup-dotnet@v4
+      # global.json pins the .NET 6 SDK; without it the runner's newer SDK would build.
+      - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "6.0.x"
+          global-json-file: global.json
       # setup-python provides `python` on every runner; Windows has no `python3`.
       - name: Python tests and recipe syntax
         run: python -m unittest discover -s tests -v
