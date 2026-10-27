@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -76,6 +77,21 @@ class AccessTests(unittest.TestCase):
                 patch("sys.stdout"):
             with self.assertRaisesRegex(ValueError, "too large"):
                 tv.main()
+        probe.assert_not_called()
+
+    def test_crlf_script_is_refused_before_the_root_session(self):
+        profile = PROFILES[0]
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "windows.sh"
+            script.write_bytes(b"#!/bin/sh\nset -eu\r\nid\r\n")
+            with patch("tv.SdbClient"), patch("tv.find_sdb"), \
+                    patch("tv.observed_model", return_value=profile["model"]), \
+                    patch("tv.observed_firmware", return_value=profile["firmware"]), \
+                    patch("tv.probe") as probe, \
+                    patch("sys.argv", ["tv.py", "--host", "192.0.2.50", "exec", "--script", str(script)]), \
+                    patch("sys.stdout"):
+                with self.assertRaisesRegex(ValueError, "CRLF.*line 2"):
+                    tv.main()
         probe.assert_not_called()
 
     def test_unsupported_model_is_refused_before_any_tv_command(self):

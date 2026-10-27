@@ -89,8 +89,9 @@ the computer, decoded on the TV and handed to a fresh `sh -c`, so quotes,
 the agent's 64 KiB frame after encoding is rejected and asks for `--script`.
 
 `exec --script` runs a reviewed script through the shell with optional repeated
-`--arg VALUE` positional arguments. There is a 30-second command budget; keep
-phases short. Logs are private and can contain device details. Do not attach
+`--arg VALUE` positional arguments. A script with Windows (CRLF) line endings
+is refused before the root session; convert it to LF and review it again.
+There is a 30-second command budget; keep phases short. Logs are private and can contain device details. Do not attach
 raw session JSON to public issues.
 
 Use one SDB/root operation at a time. If route detection selects the wrong

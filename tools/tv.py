@@ -186,6 +186,16 @@ def main():
         script = args.script.read_bytes()
         if len(script) > 45000:
             raise ValueError("Script too large for the bounded command channel; split into phases.")
+        if b"\r\n" in script:
+            # The TV runs exactly the reviewed bytes, so convert the file rather than the upload.
+            line = script[:script.index(b"\r\n")].count(b"\n") + 1
+            raise ValueError(
+                f"{args.script} has Windows (CRLF) line endings, first on line {line}. "
+                "The TV's /bin/sh would keep a carriage return at the end of every line, so "
+                "commands, paths and heredoc terminators would not match. Convert the file to LF "
+                "line endings (set the editor's line endings to LF, or run dos2unix on it), "
+                "review it and run it again. Files under recipes/ are checked out with LF "
+                "by .gitattributes; re-checkout them if they were cloned before that rule.")
         command = script_command(script, args.arg)
     else:
         if args.arg:
