@@ -72,7 +72,10 @@ If Quiet Home was installed into another profile's container, append the same
 container app ID and entry DLL that `install-launcher.sh` received.
 
 This returns routing to the saved handlers, restores the host package's
-original assembly/cache and restores its selected registry flags.
+original assembly/cache and restores its selected registry flags. When the
+snapshot recorded the original DLL's digest, the recipe checks the saved copy
+against it before changing anything; if it does not match, recover the copy
+from `.local/` instead of restoring a damaged one.
 Extra Quiet Home resources are left inert for inspection/recovery; they are
 not a running background service. Removing them is optional after successful
 restoration.

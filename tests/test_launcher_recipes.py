@@ -81,5 +81,32 @@ class LauncherRegistryTests(unittest.TestCase):
             self.conn.execute(f"INSERT INTO package_app_info VALUES ('{CONTAINER}','true','true','true','keep')")
             self.conn.commit()
 
+
+class ContainerBackupTests(unittest.TestCase):
+    def recipe(self, name):
+        return (ROOT / "recipes" / name).read_text(encoding="utf-8")
+
+    def test_snapshot_records_what_install_checks(self):
+        snapshot = self.recipe("snapshot.sh")
+        for record in ('> "$D/original-assembly.sha256"', '> "$D/original-metadata.txt"',
+                       'tar -czf "$original.tar.gz"'):
+            self.assertIn(record, snapshot)
+        self.assertIn("stat -c '%a ", snapshot)  # the mode comes first
+
+    def test_install_checks_the_backup_before_any_change_and_keeps_its_mode(self):
+        install = self.recipe("install-launcher.sh")
+        first_change = install.index('mkdir "$S/unpacked"')
+        for check in ('sha256sum -c "$D/original-assembly.sha256"', 'test -s "$original.tar.gz"',
+                      'mode=$(cut -d \' \' -f 1 "$D/original-metadata.txt")'):
+            self.assertLess(install.index(check), first_change)
+        self.assertNotIn('cp -a "$A"', install)  # the snapshot owns the backup
+        self.assertIn('chmod "$mode" "$A/bin/$dll"', install)
+        self.assertNotRegex(install, r'chmod [0-7]+ "\$A/bin/\$dll"')
+
+    def test_restore_checks_the_backup_digest_before_any_change(self):
+        restore = self.recipe("restore-launcher.sh")
+        check = restore.index('sha256sum -c "$D/original-assembly.sha256"')
+        self.assertLess(check, restore.index('"$D/Probe.dll" set-home'))
+
 if __name__ == "__main__":
     unittest.main()

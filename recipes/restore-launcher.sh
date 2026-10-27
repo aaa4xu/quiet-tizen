@@ -17,6 +17,8 @@ original=$D/${container##*.}-original
 label=User::Pkg::$container::RO
 test -s "$D/Probe.dll"
 test -s "$original/bin/$dll"
+# Snapshots older than the container backup in snapshot.sh have no digest.
+if [ -e "$D/original-assembly.sha256" ]; then sha256sum -c "$D/original-assembly.sha256"; fi
 test -s "$D/.pkgmgr_parser.db"
 sha256sum -c "$D/installed-home.sha256"
 # One registry row for the container, live and in the snapshot, before changing anything.

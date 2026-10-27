@@ -68,16 +68,22 @@ current registry flags first. This release's recipe requires the observed
 owner `201:0`. If the layout differs, stop and adapt the profile.
 
 ```sh
-tv exec --script recipes/snapshot.sh --arg home-01
+tv exec --script recipes/snapshot.sh --arg home-01 \
+  --arg com.samsung.tv.bixby-promotion --arg BixbyPromotion.dll
 tar -czf .local/package.tar.gz -C .local/package .
 tv push .local/package.tar.gz package.tar.gz
 tv exec --script recipes/install-launcher.sh --arg home-01
 ```
 
+With the container and DLL, the snapshot also copies the original container,
+records the entry DLL's digest and metadata (mode, owner, size) and packs the
+copy into `bixby-promotion-original.tar.gz` in the snapshot folder.
+
 Another profile can name a different host in its `launcher` block. The
 QE65S95F profile uses `com.samsung.tv.adplayer` and `AdPlayer.dll`, because
-Bixby Promotion is not installed there. Append both values to the last
-command above, so it becomes:
+Bixby Promotion is not installed there. Use both values in place of Bixby
+Promotion's in the snapshot command, and append them to the install command,
+so it becomes:
 
 ```sh
 tv exec --script recipes/install-launcher.sh --arg home-01 \
@@ -88,10 +94,22 @@ Append them later to `restore-launcher.sh` as well, and use that app ID in the
 Home and startup commands. The settings-bridge recipes still target Bixby
 Promotion only.
 
-The recipe backs up the original package before replacing the assembly,
-moves the cached native image out of the execution path, installs resources,
-applies the package's observed SMACK label and requests a manual launch.
-It does not change Home/startup.
+The recipe refuses to run unless that snapshot's copy still matches both its
+digest and the installed DLL. It then moves the cached native image out of the
+execution path, replaces the assembly with the original's file mode, installs
+resources, applies the package's observed SMACK label and requests a manual
+launch. It does not change Home/startup.
+
+Keep a second copy of the original container on the computer as well:
+
+```sh
+tv pull /opt/usr/share/quiet-tizen-backups/home-01/bixby-promotion-original.tar.gz \
+  .local/home-01/bixby-promotion-original.tar.gz
+```
+
+`tv pull` stops on a file it cannot transfer in one session. In that case
+pull at least the original entry DLL from the copy's `bin/` folder and the
+`original-assembly.sha256` and `original-metadata.txt` records.
 
 The new release recipes are a generalized form of the operations used on the
 original TV. Filesystem steps are not a single atomic transaction. If a step

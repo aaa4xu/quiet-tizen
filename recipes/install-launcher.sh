@@ -1,7 +1,8 @@
 #!/bin/sh
 # Install only. Home/startup routing is changed AFTER manual launch is verified.
 # SNAPSHOT_NAME [CONTAINER_APP_ID ENTRY_DLL]: both from the profile's "launcher" block;
-# the defaults are the U8000F's. Stage .local/package.tar.gz as quiet-tizen/package.tar.gz first.
+# the defaults are the U8000F's. Take the snapshot with the same container and DLL first,
+# then stage .local/package.tar.gz as quiet-tizen/package.tar.gz.
 set -eu
 test "$(id -u)" = 0
 name=${1:?Snapshot name required}
@@ -20,7 +21,13 @@ test -s "$D/.pkgmgr_parser.db"
 test -s "$S/package.tar.gz"
 test -s "$A/bin/$dll"
 test "$(stat -c %u:%g "$A/bin/$dll")" = 201:0
-test ! -e "$original"
+# snapshot.sh saved the original container; it must still match the installed DLL.
+test -s "$original/bin/$dll" || { echo 'No container backup; run snapshot.sh with the container and DLL' >&2; exit 1; }
+test -s "$original.tar.gz"
+sha256sum -c "$D/original-assembly.sha256"
+test "$(sha256sum "$A/bin/$dll" | cut -d ' ' -f 1)" = "$(cut -d ' ' -f 1 "$D/original-assembly.sha256")"
+mode=$(cut -d ' ' -f 1 "$D/original-metadata.txt")
+case "$mode" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) exit 1;; esac
 test ! -e "$A/res/quiet-home" # First install only; do not silently overwrite an existing custom launcher.
 test ! -e "$S/unpacked"
 # One registry row for the container, live and in the snapshot, before touching the package.
@@ -33,7 +40,6 @@ tar -xzf "$S/package.tar.gz" -C "$S/unpacked"
 test -s "$S/unpacked/$dll"
 test -s "$S/unpacked/Probe.dll"
 test -s "$S/unpacked/quiet-home/apps.json"
-cp -a "$A" "$original"
 cp "$S/unpacked/Probe.dll" "$D/Probe.dll"
 /usr/bin/dotnet "$D/Probe.dll" > "$D/operation-and-sources-before.txt"
 app_launcher -u 5001 -k "$container" || true
@@ -41,7 +47,7 @@ if [ -d "$A/bin/.native_image" ]; then mv "$A/bin/.native_image" "$D/home-native
 cp "$S/unpacked/$dll" "$A/bin/$dll"
 cp -R "$S/unpacked/quiet-home" "$A/res/"
 chown 201:0 "$A/bin/$dll"
-chmod 644 "$A/bin/$dll"
+chmod "$mode" "$A/bin/$dll"
 chsmack -a "$label" "$A/bin/$dll"
 sha256sum "$A/bin/$dll" > "$D/installed-home.sha256"
 find "$A/res/quiet-home" -type d -exec chmod 755 {} \;
