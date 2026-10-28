@@ -68,8 +68,10 @@ tv exec --script recipes/restore-launcher.sh \
 
 Replace the uppercase placeholders. All three happened to be
 `com.samsung.tv.csfs` on the documented TV; do not assume that on another one.
-If Quiet Home was installed into another profile's container, append the same
-container app ID and entry DLL that `install-launcher.sh` received.
+The recipe restores the container recorded in the snapshot's
+`launcher-container.txt`. Snapshots taken before that file existed default to
+Bixby Promotion; for another container, append the app ID and entry DLL that
+`install-launcher.sh` received.
 
 This returns routing to the saved handlers, restores the host package's
 original assembly/cache and restores its selected registry flags. When the

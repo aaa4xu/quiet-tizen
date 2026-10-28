@@ -1,17 +1,23 @@
 #!/bin/sh
 # SNAPSHOT_NAME ORIGINAL_MAIN_OPERATION_APP ORIGINAL_HOME_APP ORIGINAL_STARTUP_APP
-#   [CONTAINER_APP_ID ENTRY_DLL]: the same container and DLL that install-launcher.sh received.
+#   [CONTAINER_APP_ID ENTRY_DLL]: only for snapshots without launcher-container.txt.
 # Read all three original IDs from that TV's saved records; do not guess them.
 set -eu
 test "$(id -u)" = 0
 name=${1:?}; operation=${2:?}; home=${3:?}; startup=${4:?}
-container=${5:-com.samsung.tv.bixby-promotion}
-dll=${6:-BixbyPromotion.dll}
 case "$name" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
-for value in "$operation" "$home" "$startup" "$container" "$dll"; do
-    case "$value" in ''|*[!A-Za-z0-9_.-]*) exit 1;; esac
-done
 D=/opt/usr/share/quiet-tizen-backups/$name
+if [ -s "$D/launcher-container.txt" ]; then
+    read -r container dll < "$D/launcher-container.txt"
+    if [ -n "${5:-}" ]; then test "$container $dll" = "$5 ${6:-}"; fi
+else
+    # Older snapshots: the container install-launcher.sh received, the U8000F's by default.
+    container=${5:-com.samsung.tv.bixby-promotion}
+    dll=${6:-BixbyPromotion.dll}
+fi
+for value in "$operation" "$home" "$startup" "$container" "$dll"; do
+    case "$value" in ''|.*|*[!A-Za-z0-9_.-]*) exit 1;; esac
+done
 A=/opt/usr/apps/$container
 original=$D/${container##*.}-original
 label=User::Pkg::$container::RO

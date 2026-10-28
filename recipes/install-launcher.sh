@@ -1,18 +1,21 @@
 #!/bin/sh
 # Install only. Home/startup routing is changed AFTER manual launch is verified.
-# SNAPSHOT_NAME [CONTAINER_APP_ID ENTRY_DLL]: both from the profile's "launcher" block;
-# the defaults are the U8000F's. Take the snapshot with the same container and DLL first,
-# then stage .local/package.tar.gz as quiet-tizen/package.tar.gz.
+# SNAPSHOT_NAME: a snapshot.sh run that kept the original container; stage
+# .local/package.tar.gz as quiet-tizen/package.tar.gz first.
 set -eu
 test "$(id -u)" = 0
 name=${1:?Snapshot name required}
-container=${2:-com.samsung.tv.bixby-promotion}
-dll=${3:-BixbyPromotion.dll}
 case "$name" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
-for value in "$container" "$dll"; do
-    case "$value" in ''|*[!A-Za-z0-9_.-]*) exit 1;; esac
-done
 D=/opt/usr/share/quiet-tizen-backups/$name
+test -s "$D/launcher-container.txt" || { echo 'No container backup in this snapshot; take a new one before installing' >&2; exit 1; }
+read -r container dll < "$D/launcher-container.txt"
+for value in "$container" "$dll"; do
+    case "$value" in ''|.*|*[!A-Za-z0-9_.-]*) exit 1;; esac
+done
+# tv.py passes the current profile's launcher; the snapshot must be of that same container.
+if [ -n "${QUIET_LAUNCHER_APP:-}" ]; then
+    test "$container $dll" = "$QUIET_LAUNCHER_APP ${QUIET_LAUNCHER_DLL:-}" || { echo "The snapshot backed up $container, not the profile's launcher" >&2; exit 1; }
+fi
 A=/opt/usr/apps/$container
 original=$D/${container##*.}-original
 label=User::Pkg::$container::RO
@@ -22,7 +25,7 @@ test -s "$S/package.tar.gz"
 test -s "$A/bin/$dll"
 test "$(stat -c %u:%g "$A/bin/$dll")" = 201:0
 # snapshot.sh saved the original container; it must still match the installed DLL.
-test -s "$original/bin/$dll" || { echo 'No container backup; run snapshot.sh with the container and DLL' >&2; exit 1; }
+test -s "$original/bin/$dll"
 test -s "$original.tar.gz"
 sha256sum -c "$D/original-assembly.sha256"
 test "$(sha256sum "$A/bin/$dll" | cut -d ' ' -f 1)" = "$(cut -d ' ' -f 1 "$D/original-assembly.sha256")"

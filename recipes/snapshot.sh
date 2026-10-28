@@ -1,24 +1,25 @@
 #!/bin/sh
 # Run via tools/tv.py exec --script recipes/snapshot.sh --arg UNIQUE_PHASE_NAME
-# Before installing Quiet Home, also pass the profile's launcher CONTAINER_APP_ID and
-# ENTRY_DLL: the snapshot then keeps the original container for install and restore.
+# tv.py passes the profile's launcher container and entry DLL. Until Quiet Home is
+# installed there, the snapshot also keeps the original container for install and restore.
 set -eu
 test "$(id -u)" = 0
 name=${1:?Give this snapshot a unique phase name}
-container=${2:-}
+container=${QUIET_LAUNCHER_APP:?Run through tools/tv.py, which passes the profile launcher}
+dll=${QUIET_LAUNCHER_DLL:?Run through tools/tv.py, which passes the profile launcher}
 case "$name" in ''|*[!A-Za-z0-9_-]*) echo 'Invalid snapshot name' >&2; exit 1;; esac
+for value in "$container" "$dll"; do
+    case "$value" in .*|*[!A-Za-z0-9_.-]*) echo 'Invalid container or DLL' >&2; exit 1;; esac
+done
 D=/opt/usr/share/quiet-tizen-backups/$name
+A=/opt/usr/apps/$container
 umask 077
 test ! -e "$D" || { echo 'Snapshot already exists; never overwrite the original.' >&2; exit 1; }
-if [ -n "$container" ]; then
-    dll=${3:?Entry DLL required with the container}
-    for value in "$container" "$dll"; do
-        case "$value" in *[!A-Za-z0-9_.-]*) echo 'Invalid container or DLL' >&2; exit 1;; esac
-    done
-    A=/opt/usr/apps/$container
+# Back up Samsung's container, not an installed launcher; later snapshots skip it.
+backup=
+if [ ! -e "$A/res/quiet-home" ]; then
     test -s "$A/bin/$dll"
-    # Back up Samsung's container, not an installed launcher.
-    test ! -e "$A/res/quiet-home" || { echo 'Quiet Home is already installed in this container; keep the earlier snapshot' >&2; exit 1; }
+    backup=1
 fi
 mkdir -p "$D"
 for db in .pkgmgr_parser .app-context .webappservice; do
@@ -33,7 +34,7 @@ for key in db/appfw/home_appid db/appfw/startup_appid \
     printf '%s\n' "$key"
     vconftool get "$key"
 done > "$D/preferences-before.txt"
-if [ -n "$container" ]; then
+if [ -n "$backup" ]; then
     original=$D/${container##*.}-original
     cp -a "$A" "$original"
     # install-launcher.sh checks the copy against this digest and restores the entry DLL's mode.
@@ -42,7 +43,11 @@ if [ -n "$container" ]; then
     stat -c '%a %u:%g %s' "$A/bin/$dll" > "$D/original-metadata.txt"
     # One archive to copy into .local/ with tv pull.
     tar -czf "$original.tar.gz" -C "$D" "${original##*/}"
+    # install-launcher.sh and restore-launcher.sh read the container and DLL from here.
+    printf '%s %s\n' "$container" "$dll" > "$D/launcher-container.txt"
     echo "Original container: $original (archive $original.tar.gz)"
+else
+    echo "Quiet Home is already installed in $container; this snapshot keeps no container copy."
 fi
 echo "Consistent snapshots: $D"
 echo 'Record the main-operation home app with Probe.dll before changing launcher routing.'

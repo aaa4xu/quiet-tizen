@@ -77,12 +77,25 @@ def check_identity(model, firmware):
                          "from About This TV. Do not guess this value.")
     if firmware not in [profile["firmware"] for profile in PROFILES if profile["model"] == model]:
         raise ValueError(f"Unsupported firmware {firmware!r}; only a documented build is accepted.")
+    return next(profile for profile in PROFILES if (profile["model"], profile["firmware"]) == (model, firmware))
 
 
-def script_command(script, arguments):
+def launcher_environment(profile):
+    # Recipes read Quiet Home's host container from these instead of positional arguments.
+    launcher = profile["launcher"]
+    environment = {"QUIET_LAUNCHER_APP": launcher["app_id"], "QUIET_LAUNCHER_DLL": launcher["dll"]}
+    for value in environment.values():
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value):
+            raise ValueError(f"Invalid launcher value {value!r} in the profile.")
+    return environment
+
+
+def script_command(script, arguments, environment=None):
     # Base64 keeps the script intact through the command channel; decode it before sh reads it.
     encoded = base64.b64encode(script).decode()
-    return f"printf '%s' {shlex.quote(encoded)} | base64 -d | /bin/sh -s -- " + shlex.join(arguments)
+    assignments = "".join(f"{name}={shlex.quote(value)} " for name, value in (environment or {}).items())
+    return (f"printf '%s' {shlex.quote(encoded)} | base64 -d | {assignments}/bin/sh -s -- "
+            + shlex.join(arguments))
 
 
 def literal_command(text):
@@ -182,7 +195,7 @@ def main():
         print(_capture(client, "uname -srmo; readlink -f /usr/share/dotnet.tizen/netcoreapp"))
         print("Preflight only; root is not yet confirmed.")
         return
-    check_identity(model, firmware)
+    profile = check_identity(model, firmware)
     if args.action == "push":
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,100}", args.name):
             raise ValueError("Use a simple staging filename without directory components.")
@@ -219,7 +232,7 @@ def main():
                 "line endings (set the editor's line endings to LF, or run dos2unix on it), "
                 "review it and run it again. Files under recipes/ are checked out with LF "
                 "by .gitattributes; re-checkout them if they were cloned before that rule.")
-        commands = (script_command(script, args.arg),)
+        commands = (script_command(script, args.arg, launcher_environment(profile)),)
     else:
         if args.arg:
             raise ValueError("--arg requires --script.")

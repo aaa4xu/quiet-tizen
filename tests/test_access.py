@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import tv
-from tv import check_identity, decode_pull, framework_pull_plan, literal_command, observed_firmware, parse_firmware, private_path, script_command, PROFILES
+from tv import check_identity, decode_pull, launcher_environment, framework_pull_plan, literal_command, observed_firmware, parse_firmware, private_path, script_command, PROFILES
 from tv_side import runs_on_tv
 
 
@@ -47,6 +47,20 @@ class AccessTests(unittest.TestCase):
         command = script_command(script, ["home-01", "two words", "it's"])
         result = subprocess.run(["sh", "-c", command], check=True, capture_output=True)
         self.assertEqual(result.stdout, b"home-01|two words|it's|")
+
+    @runs_on_tv
+    def test_script_gets_the_profile_launcher(self):
+        script = b'#!/bin/sh\nprintf "%s|%s|%s" "$QUIET_LAUNCHER_APP" "$QUIET_LAUNCHER_DLL" "$1"\n'
+        for profile in PROFILES:
+            environment = launcher_environment(profile)
+            command = script_command(script, ["home-01"], environment)
+            result = subprocess.run(["sh", "-c", command], check=True, capture_output=True, text=True)
+            launcher = profile["launcher"]
+            self.assertEqual(result.stdout, f"{launcher['app_id']}|{launcher['dll']}|home-01")
+
+    def test_launcher_values_cannot_reach_the_shell_unchecked(self):
+        with self.assertRaises(ValueError):
+            launcher_environment({"launcher": {"app_id": "a;reboot", "dll": "A.dll"}})
 
     @runs_on_tv
     def test_command_reaches_shell_with_its_own_quoting(self):

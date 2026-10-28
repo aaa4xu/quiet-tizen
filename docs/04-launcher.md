@@ -89,31 +89,26 @@ current registry flags first. This release's recipe requires the observed
 owner `201:0`. If the layout differs, stop and adapt the profile.
 
 ```sh
-tv exec --script recipes/snapshot.sh --arg home-01 \
-  --arg com.samsung.tv.bixby-promotion --arg BixbyPromotion.dll
+tv exec --script recipes/snapshot.sh --arg home-01
 tar -czf .local/package.tar.gz -C .local/package .
 tv push .local/package.tar.gz package.tar.gz
 tv exec --script recipes/install-launcher.sh --arg home-01
 ```
 
-With the container and DLL, the snapshot also copies the original container,
-records the entry DLL's digest and metadata (mode, owner, size) and packs the
-copy into `bixby-promotion-original.tar.gz` in the snapshot folder.
+`tv exec --script` passes the matched profile's `launcher` block to every
+recipe as `QUIET_LAUNCHER_APP` and `QUIET_LAUNCHER_DLL`. Until Quiet Home is
+installed in that container, the snapshot also copies the original container,
+records the entry DLL's digest and metadata (mode, owner, size), packs the
+copy into `bixby-promotion-original.tar.gz` in the snapshot folder and writes
+the container and DLL to `launcher-container.txt`. The install and restore
+recipes take them from there, so they always work on the container that was
+backed up. Snapshots taken after the install keep no container copy.
 
-Another profile can name a different host in its `launcher` block. The
-QE65S95F profile uses `com.samsung.tv.adplayer` and `AdPlayer.dll`, because
-Bixby Promotion is not installed there. Use both values in place of Bixby
-Promotion's in the snapshot command, and append them to the install command,
-so it becomes:
-
-```sh
-tv exec --script recipes/install-launcher.sh --arg home-01 \
-  --arg com.samsung.tv.adplayer --arg AdPlayer.dll
-```
-
-Append them later to `restore-launcher.sh` as well, and use that app ID in the
-Home and startup commands. The settings-bridge recipes still target Bixby
-Promotion only.
+Another profile can name a different host. The QE65S95F profile uses
+`com.samsung.tv.adplayer` and `AdPlayer.dll`, because Bixby Promotion is not
+installed there; the archive is then `adplayer-original.tar.gz`. Use that app
+ID in the Home and startup commands. The settings-bridge recipes still target
+Bixby Promotion only.
 
 The recipe refuses to run unless that snapshot's copy still matches both its
 digest and the installed DLL. It then moves the cached native image out of the

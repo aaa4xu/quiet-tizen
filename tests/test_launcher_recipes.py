@@ -108,5 +108,47 @@ class ContainerBackupTests(unittest.TestCase):
         check = restore.index('sha256sum -c "$D/original-assembly.sha256"')
         self.assertLess(check, restore.index('"$D/Probe.dll" set-home'))
 
+class RecordedContainerTests(unittest.TestCase):
+    """install-launcher.sh and restore-launcher.sh take the container the snapshot backed up."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.directory = Path(self.temp.name)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def header(self, recipe, args, environment=None, recorded=None):
+        if recorded is not None:
+            (self.directory / "launcher-container.txt").write_text(recorded + "\n")
+        script = (ROOT / "recipes" / recipe).read_text(encoding="utf-8")
+        script = script[:script.index("\nA=/opt/usr/apps/")]
+        script = script.replace('test "$(id -u)" = 0\n', "")
+        script = script.replace("D=/opt/usr/share/quiet-tizen-backups/$name", f"D={self.directory}")
+        script += '\nprintf "%s %s" "$container" "$dll"\n'
+        result = subprocess.run(["sh", "-c", script, "sh", *args], capture_output=True, text=True,
+                                env={"PATH": "/usr/bin:/bin", **(environment or {})})
+        return result.stdout if result.returncode == 0 else None
+
+    @runs_on_tv
+    def test_install_uses_the_recorded_container_of_the_same_profile(self):
+        profile = {"QUIET_LAUNCHER_APP": CONTAINER, "QUIET_LAUNCHER_DLL": "Host.dll"}
+        self.assertIsNone(self.header("install-launcher.sh", ["home-01"], profile))  # no container backup
+        self.assertEqual(self.header("install-launcher.sh", ["home-01"], profile, f"{CONTAINER} Host.dll"),
+                         f"{CONTAINER} Host.dll")
+        other = {"QUIET_LAUNCHER_APP": "other.host", "QUIET_LAUNCHER_DLL": "Host.dll"}
+        self.assertIsNone(self.header("install-launcher.sh", ["home-01"], other))
+
+    @runs_on_tv
+    def test_restore_prefers_the_recorded_container(self):
+        ids = ["home-01", "op.app", "home.app", "startup.app"]
+        self.assertEqual(self.header("restore-launcher.sh", ids),
+                         "com.samsung.tv.bixby-promotion BixbyPromotion.dll")  # older snapshot
+        self.assertEqual(self.header("restore-launcher.sh", [*ids, CONTAINER, "Host.dll"]), f"{CONTAINER} Host.dll")
+        self.assertEqual(self.header("restore-launcher.sh", ids, recorded=f"{CONTAINER} Host.dll"),
+                         f"{CONTAINER} Host.dll")
+        self.assertIsNone(self.header("restore-launcher.sh", [*ids, "other.host", "Host.dll"]))
+
+
 if __name__ == "__main__":
     unittest.main()
