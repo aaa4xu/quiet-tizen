@@ -236,6 +236,30 @@ public sealed class QuietHome : NUIApplication
   try{int n=Convert.ToInt32(hex.TrimStart('#'),16);return new Color(((n>>16)&255)/255f,((n>>8)&255)/255f,(n&255)/255f,1);}
   catch{return white;}
  }
+ // Placeholder colors: text takes whichever of dark ink or white has the higher APCA contrast
+ // (0.0.98G-4g) with the card; the circle is the card's own color with OKLab lightness moved toward the text.
+ static readonly Color placeholderInk=new Color(.11f,.11f,.12f,1);
+ static double Linear(double c){return c<=.04045?c/12.92:Math.Pow((c+.055)/1.055,2.4);}
+ static double Gamma(double c){c=Math.Clamp(c,0,1);return c<=.0031308?12.92*c:1.055*Math.Pow(c,1/2.4)-.055;}
+ static double ApcaY(Color c){double y=.2126729*Math.Pow(c.R,2.4)+.7151522*Math.Pow(c.G,2.4)+.0721750*Math.Pow(c.B,2.4);return y<.022?y+Math.Pow(.022-y,1.414):y;}
+ static double Apca(Color text,Color bg)
+ {
+  double yt=ApcaY(text),yb=ApcaY(bg);if(Math.Abs(yb-yt)<.0005)return 0;
+  double s=yb>yt?(Math.Pow(yb,.56)-Math.Pow(yt,.57))*1.14:(Math.Pow(yb,.65)-Math.Pow(yt,.62))*1.14;
+  return Math.Abs(s)<.1?0:Math.Abs(s)-.027;
+ }
+ static bool DarkText(Color bg){return Apca(placeholderInk,bg)>Apca(new Color(1,1,1,1),bg);}
+ static Color Tone(Color bg,double delta)
+ {
+  double r=Linear(bg.R),g=Linear(bg.G),b=Linear(bg.B);
+  double l=Math.Cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.Cbrt(.2119034982*r+.6806995451*g+.1073969566*b),s=Math.Cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  // Shift lightness in Ottosson's toe-corrected Lr so near-black cards still get a visible step.
+  double L=.2104542553*l+.7936177850*m-.0040720468*s,A=1.9779984951*l-2.4285922050*m+.4505937099*s,B=.0259040371*l+.7827717662*m-.8086757660*s;
+  const double k1=.206,k2=.03,k3=(1+k1)/(1+k2);
+  double lr=(k3*L-k1+Math.Sqrt((k3*L-k1)*(k3*L-k1)+4*k2*k3*L))/2+delta;L=(lr*lr+k1*lr)/(k3*(lr+k2));
+  l=Math.Pow(L+.3963377774*A+.2158037573*B,3);m=Math.Pow(L-.1055613458*A-.0638541728*B,3);s=Math.Pow(L-.0894841775*A-1.2914855480*B,3);
+  return new Color((float)Gamma(4.0767416621*l-3.3077115913*m+.2309699292*s),(float)Gamma(-1.2684380046*l+2.6097574011*m-.3413193965*s),(float)Gamma(-.0041960863*l-.7034186147*m+1.7076147010*s),1);
+ }
  void AddAppArtwork(View card,LibraryApp app,int w,int h)
  {
   if(!app.Utility){
@@ -245,8 +269,7 @@ public sealed class QuietHome : NUIApplication
   }
   // Placeholders carry no text (the TV's SVG renderer draws none), so the name goes on top.
   if(app.Asset.StartsWith("placeholders/")){
-   var bg=HexColor(app.Background);bool light=.2126f*bg.R+.7152f*bg.G+.0722f*bg.B>.6f;
-   var name=Label(app.Name,16,0,w-32,h,(float)Math.Round(h*.17),light?new Color(.11f,.11f,.12f,1):white,"Semibold");
+   var name=Label(app.Name,16,0,w-32,h,(float)Math.Round(h*.17),DarkText(HexColor(app.Background))?placeholderInk:white,"Semibold");
    name.HorizontalAlignment=HorizontalAlignment.Center;name.MultiLine=true;card.Add(name);
   }
   if(app.Utility){
@@ -280,6 +303,8 @@ public sealed class QuietHome : NUIApplication
    SamplingMode=SamplingModeType.BoxThenLanczos,
    DesiredWidth=(int)Math.Ceiling(iw*2/cropWidth),DesiredHeight=(int)Math.Ceiling(ih*2/cropHeight),
    ReleasePolicy=ReleasePolicyType.Destroyed,CornerRadius=new Vector4(radius,radius,radius,radius)};
+  // The placeholder's circle is opaque white; tinting it gives the card a tonal accent.
+  if(app.Asset.StartsWith("placeholders/")){var bg=HexColor(app.Background);image.Color=Tone(bg,DarkText(bg)?-.06:.06);}
   if(crop!=null)image.PixelArea=new RelativeVector4(crop[0],crop[1],crop[2],crop[3]);
   cached=new CachedArtwork{Image=image,Parent=artworkPreloadRoot};
   artworkCache.Add(key,cached);artworkViewsCreated++;
