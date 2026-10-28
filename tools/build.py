@@ -52,6 +52,8 @@ def main():
         shutil.copyfile(ROOT / ".local/build/Probe/Probe.dll", destination / "Probe.dll")
         assets = destination / "quiet-home"
         shutil.copytree(ROOT / "launcher/assets", assets)
+        # Demo mode (README screenshots) shows the public catalog even when a local one is used.
+        shutil.copyfile(assets / "apps.json", assets / "apps.public.json")
         local_catalog = ROOT / "launcher/assets/apps.local.json"
         if local_catalog.exists():
             shutil.copyfile(local_catalog, assets / "apps.json")

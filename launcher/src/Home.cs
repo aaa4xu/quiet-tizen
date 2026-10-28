@@ -23,7 +23,10 @@ public sealed class QuietHome : NUIApplication
  readonly Dictionary<string,CachedArtwork> artworkCache=new Dictionary<string,CachedArtwork>();
  View artworkPreloadRoot;
  int artworkViewsCreated,pageArtworkCold;
- List<LibraryApp> library=new List<LibraryApp>();
+ List<LibraryApp> library=new List<LibraryApp>(),ownLibrary,publicLibrary;
+ // Demo mode (quiet_demo=1) shows the public catalog, fixed inputs, settings and clock for README screenshots.
+ bool demo;
+ const string DemoIcons="/usr/apps/com.samsung.tv.theme-resource/shared/res/VD_ICONS/i_icon_device_m_";
  int libraryPage;
  string libraryError="";
  List<InputSource> inputSources=new List<InputSource>();
@@ -79,6 +82,7 @@ public sealed class QuietHome : NUIApplication
   base.OnCreate();
   try{fontLoaded=FontClient.Instance.AddCustomFontDirectory(Root+"fonts");}catch{fontLoaded=false;}
   try{library=AppLibrary.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
+  ownLibrary=library;
   LoadTheme();
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   // Samsung Home's source editor opens over this window without pausing it; reread the inputs on return.
@@ -87,22 +91,48 @@ public sealed class QuietHome : NUIApplication
   PreloadArtwork();
   RefreshSource();selected=SourceIndex();BuildPage();
   clockTimer=new Tizen.NUI.Timer(30000);
-  clockTimer.Tick+=(s,e)=>{if(clock!=null)clock.Text=DateTime.Now.ToString("h:mm tt");return true;};clockTimer.Start();WriteState("created");
+  clockTimer.Tick+=(s,e)=>{if(clock!=null)clock.Text=Clock();return true;};clockTimer.Start();WriteState("created");
  }
  protected override void OnResume(){base.OnResume();clockTimer?.Start();RefreshSource();RefreshInputCards();if(tabs!=null&&page==2){RefreshSettings();UpdateFocus(false);}WriteState("resumed");}
- protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage();}else Home("home_request");}
+ protected override void OnAppControlReceived(AppControlReceivedEventArgs e)
+ {
+  base.OnAppControlReceived(e);var extra=e.ReceivedAppControl.ExtraData;
+  bool changed=ApplyLaunchOptions(extra);string requested;extra.TryGet("quiet_page",out requested);
+  if(requested=="settings")OpenSettings("settings_request");
+  else if(requested=="apps"){page=1;area=1;selected=0;libraryPage=0;BuildPage();}
+  else{if(changed&&tabs!=null){RefreshInputSources();page=0;area=1;editing="";selected=SourceIndex();BuildPage();}Home("home_request");}
+ }
+ // quiet_demo=1 enters demo mode and any other launch leaves it; quiet_theme=light|dark lasts until then
+ // and is not saved. Returns whether the page must be rebuilt.
+ bool ApplyLaunchOptions(AppControl.ExtraDataCollection extra)
+ {
+  string value;bool wantDemo=extra.TryGet("quiet_demo",out value)&&value=="1",changed=wantDemo!=demo;
+  if(changed){
+   demo=wantDemo;libraryPage=0;
+   if(demo&&publicLibrary==null)try{publicLibrary=AppLibrary.Load(Root+"apps.public.json");}catch{publicLibrary=ownLibrary;}
+   library=demo?publicLibrary:ownLibrary;
+  }
+  if(extra.TryGet("quiet_theme",out value)&&(value=="light"||value=="dark")){if(dark!=(value=="dark")){dark=value=="dark";ApplyTheme();changed=true;}}
+  else if(changed&&!demo)LoadTheme();
+  return changed;
+ }
+ string Clock(){return demo?"9:41 AM":DateTime.Now.ToString("h:mm tt");}
  protected override void OnPause(){base.OnPause();editing="";clockTimer?.Stop();WriteState("paused");}
  void Home(string activity){clockTimer?.Start();RefreshSource();bool inputsChanged=RefreshInputSources();if(tabs!=null){bool unchanged=!inputsChanged&&page==0&&area==1&&editing==""&&selected==SourceIndex();page=0;area=1;editing="";selected=SourceIndex();if(!unchanged)BuildPage();WriteState(activity);}}
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage();WriteState(activity);}
  void RefreshSource(){try{int n;if(vconf_get_int("memory/system/source_type",out n)==0&&n>=0)lastSource=n;}catch{}}
  // Input cards come from the TV's source list; the input cards are the page's first slots.
- int SourceIndex(){return Math.Max(0,inputSources.FindIndex(s=>s.SourceType==lastSource));}
+ int SourceIndex(){return demo?0:Math.Max(0,inputSources.FindIndex(s=>s.SourceType==lastSource));}
  // Returns whether the connected inputs changed. The list is a malloc'd JSON string owned by the caller.
  bool RefreshInputSources()
  {
   var before=string.Join(";",inputSources.ConvertAll(s=>s.SourceType+":"+s.EditName+":"+s.DetectedName+":"+s.IconPath));
   IntPtr p=IntPtr.Zero;inputError="";
-  try{
+  if(demo)inputSources=new List<InputSource>{
+   new InputSource{ConnectionState=true,SourceType=0,IconPath=DemoIcons+"tv.svg"},
+   new InputSource{ConnectionState=true,SourceType=14,EditName="Game console",IconPath=DemoIcons+"gamepad.svg"},
+   new InputSource{ConnectionState=true,SourceType=15,IconPath=DemoIcons+"hdmi2.svg"}};
+  else try{
    p=get_source_list();
    if(p==IntPtr.Zero){inputSources=new List<InputSource>();inputError="empty";}
    else inputSources=(JsonSerializer.Deserialize<List<InputSource>>(Marshal.PtrToStringAnsi(p),new JsonSerializerOptions{PropertyNameCaseInsensitive=true})??new List<InputSource>()).FindAll(s=>s.ConnectionState);
@@ -144,7 +174,7 @@ public sealed class QuietHome : NUIApplication
   Text(page==0?"Home":page==1?"Your Apps":"Quick Settings",76,55,1350,100,76,ink,"Display");
   tabs=new TextLabel[3];string[] nav={"Inputs","Apps","Settings"};int[] tx={54,221,366};int[] tw={153,131,182};
   for(int i=0;i<3;i++){tabs[i]=Text(nav[i],tx[i],158,tw[i],68,30,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;}
-  clock=Text(DateTime.Now.ToString("h:mm tt"),1540,170,300,45,24,muted);clock.HorizontalAlignment=HorizontalAlignment.End;
+  clock=Text(Clock(),1540,170,300,45,24,muted);clock.HorizontalAlignment=HorizontalAlignment.End;
   if(page==0){
    RefreshInputSources();BuildInputs();
   }else if(page==1){
@@ -288,7 +318,8 @@ public sealed class QuietHome : NUIApplication
  }
  CachedArtwork GetArtwork(LibraryApp app,int w,int h)
  {
-  string key=app.Id+"@"+w+"x"+h;
+  // The public and own catalogs can share an app ID with different art or color.
+  string key=app.Id+"|"+app.Asset+"|"+app.Background+"@"+w+"x"+h;
   if(artworkCache.TryGetValue(key,out var cached))return cached;
   bool cover=app.Fit=="cover",full=cover||app.Fit=="contain-full";
   int iw=full?w:w-54,ih=full?h:h-40;var crop=app.Crop;
@@ -384,10 +415,10 @@ public sealed class QuietHome : NUIApplication
   clock.Opacity=area==3?0:1;toolbarHint.Text=area==3?slots[selected].Name:"";
   detail.Text=page==1&&area==1&&slots[selected].Row>=0?slots[selected].Name+" · "+slots[selected].Description:area==0?"":area==2?slots[selected].Name:"";
   if(page==2){
-   slots[0].Label.Text=currentVolume<0?"Unavailable":currentVolume.ToString();
-   slots[1].Label.Text=SettingName("brightness");
-   slots[2].Label.Text=SettingName("game-mode");
-   slots[3].Label.Text=SettingName("sleeptimer");
+   slots[0].Label.Text=demo?"20":currentVolume<0?"Unavailable":currentVolume.ToString();
+   slots[1].Label.Text=demo?"45":SettingName("brightness");
+   slots[2].Label.Text=demo?"Off":SettingName("game-mode");
+   slots[3].Label.Text=demo?"Off":SettingName("sleeptimer");
    slots[4].Label.Text=dark?"Dark":"Light";
    slots[5].Label.Text="Pair controller";
    slots[6].Label.Text="Connections";
@@ -487,6 +518,6 @@ public sealed class QuietHome : NUIApplication
    if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
  }
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
+ void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\ndemo="+demo+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
  public static void Main(string[] args){using(var app=new QuietHome())app.Run(args);}
 }
