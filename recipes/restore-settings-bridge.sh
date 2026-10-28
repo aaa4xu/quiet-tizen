@@ -9,21 +9,26 @@ Q=/opt/usr/apps/com.samsung.tv.quicklaunch
 test -s "$D/QuickLaunch-before.dll"
 test -s "$D/.app-context.db"
 sha256sum -c "$D/installed-bridge.sha256"
+# Bridges installed before bridge-target.txt existed always targeted Bixby Promotion.
+target=package:com.samsung.tv.bixby-promotion
+if [ -s "$D/bridge-target.txt" ]; then target=$(cat "$D/bridge-target.txt"); fi
+case "$target" in package:*) ;; *) exit 1;; esac
+case "${target#package:}" in ''|.*|*[!A-Za-z0-9_.-]*) exit 1;; esac
 for database in /opt/dbspace/.app-context.db "$D/.app-context.db"; do
-    test "$(sqlite3 -readonly "$database" "SELECT count(*) FROM key_filter WHERE appid='com.samsung.tv.quicklaunch' AND key='XF86More';")" = 1
-    test "$(sqlite3 -readonly "$database" "SELECT count(*) FROM key_filter WHERE appid='org.tizen.menu' AND key='XF86SysMenu';")" = 1
+    test "$(sqlite3 -readonly "$database" "SELECT count(*) FROM key_filter WHERE appid='com.samsung.tv.quicklaunch' AND key='XF86More' AND IFNULL(on_selector,'')='';")" = 1
+    test "$(sqlite3 -readonly "$database" "SELECT count(*) FROM key_filter WHERE appid='org.tizen.menu' AND key='XF86SysMenu' AND IFNULL(on_selector,'')='';")" = 1
 done
 sqlite3 -bail /opt/dbspace/.app-context.db <<SQL
 ATTACH '$D/.app-context.db' AS before;
 BEGIN IMMEDIATE;
 CREATE TEMP TABLE guard(ok INTEGER CHECK(ok=1));
-INSERT INTO guard SELECT count(*)=2 FROM key_filter live JOIN before.key_filter old ON live.appid=old.appid AND live.key=old.key
-WHERE ((live.appid='com.samsung.tv.quicklaunch' AND live.key='XF86More') OR (live.appid='org.tizen.menu' AND live.key='XF86SysMenu'))
-AND live.target_selector='package:com.samsung.tv.bixby-promotion'
+INSERT INTO guard SELECT count(*)=2 FROM key_filter live JOIN before.key_filter old ON live.appid=old.appid AND live.key=old.key AND IFNULL(old.on_selector,'')=''
+WHERE ((live.appid='com.samsung.tv.quicklaunch' AND live.key='XF86More') OR (live.appid='org.tizen.menu' AND live.key='XF86SysMenu')) AND IFNULL(live.on_selector,'')=''
+AND live.target_selector='$target'
 AND live.args='quiet_page:settings __K_SPLASH_SCREEN:LA_UI_VR_TRANSPARENT';
-UPDATE key_filter SET target_selector=(SELECT old.target_selector FROM before.key_filter old WHERE old.appid=key_filter.appid AND old.key=key_filter.key),
-args=(SELECT old.args FROM before.key_filter old WHERE old.appid=key_filter.appid AND old.key=key_filter.key)
-WHERE (appid='com.samsung.tv.quicklaunch' AND key='XF86More') OR (appid='org.tizen.menu' AND key='XF86SysMenu');
+UPDATE key_filter SET target_selector=(SELECT old.target_selector FROM before.key_filter old WHERE old.appid=key_filter.appid AND old.key=key_filter.key AND IFNULL(old.on_selector,'')=''),
+args=(SELECT old.args FROM before.key_filter old WHERE old.appid=key_filter.appid AND old.key=key_filter.key AND IFNULL(old.on_selector,'')='')
+WHERE ((appid='com.samsung.tv.quicklaunch' AND key='XF86More') OR (appid='org.tizen.menu' AND key='XF86SysMenu')) AND IFNULL(on_selector,'')='';
 DROP TABLE guard;
 COMMIT;
 SQL

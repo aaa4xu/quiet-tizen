@@ -107,8 +107,7 @@ backed up. Snapshots taken after the install keep no container copy.
 Another profile can name a different host. The QE65S95F profile uses
 `com.samsung.tv.adplayer` and `AdPlayer.dll`, because Bixby Promotion is not
 installed there; the archive is then `adplayer-original.tar.gz`. Use that app
-ID in the Home and startup commands. The settings-bridge recipes still target
-Bixby Promotion only.
+ID in the Home and startup commands.
 
 The recipe refuses to run unless that snapshot's copy still matches both its
 digest and the installed DLL. It then moves the cached native image out of the
@@ -234,6 +233,10 @@ tv exec --script recipes/snapshot.sh --arg shell-01
 tv exec --script recipes/install-settings-bridge.sh --arg shell-01
 ```
 
+The recipe routes the keys to the container that holds Quiet Home's
+`res/quiet-home` and stops unless there is exactly one. It records that
+container in `bridge-target.txt` for the restore.
+
 This replaces `/opt/usr/apps/com.samsung.tv.quicklaunch/bin/QuickLaunch.dll`
 and updates two `key_filter` rules:
 
@@ -246,10 +249,11 @@ The recipe selects semantic keys and checks the saved values. It does not
 copy another TV's row numbers. It notifies
 `memory/appfw/app_context_db_change` after the transaction.
 
-The recipe expects exactly one row for each rule. A QN75QN85DDFXZA on
-`T-PTMDAKUC-0090-2130.0` has **two** `com.samsung.tv.quicklaunch` /
-`XF86More` rows, so the recipe stops there before changing anything. Count
-the rows on your TV first; this release has no recipe for a duplicated rule.
+Only each key's unconditional row (empty `on_selector`) is redirected, and
+the recipe stops unless there is exactly one. Conditional rows stay as they
+are. A QN75QN85DDFXZA on `T-PTMDAKUC-0090-2130.0` has **two**
+`com.samsung.tv.quicklaunch` / `XF86More` rows; check that the second one is
+conditional before you run the recipe there.
 
 Test both settings buttons, then generate/apply the **`light-shell`** cleanup
 group from the `shell-01` registry snapshot. That disables the native sidebar
