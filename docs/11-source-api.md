@@ -30,6 +30,25 @@ The icons are colored SVGs with gradients and render on both themes. An
 unnamed input's icon file carries its HDMI number, which Quiet Home uses as
 the card's name. `connect_source(int sourceType)` switches to an input.
 
+## Change notifications
+
+`register_sourcelist_changed_callback(void (*cb)(int what, void* data), void* data)`
+subscribes to list changes; `unregister_sourcelist_changed_callback(void* data)`
+removes the subscription registered with the same non-null `data`. Both
+returned 0 when they worked. In a 24-second test, unplugging an HDMI device
+and plugging it back produced one call each, about eight seconds apart.
+`what` was 0 both times, `data` came back unchanged, and the calls arrived on
+a thread other than the caller's. A disconnected device disappeared from
+`get_source_list()` instead of turning `connectionState` false. Editing an
+input in Samsung's source list also fires the callback.
+
+Quiet Home subscribes at start-up and posts each call to its UI thread
+through the NUI synchronization context; the Home page then rereads the
+list and redraws if it changed. On the QE65S95F the cards followed an
+unplugged and replugged device and a rename without any key press. The
+reread on window focus and on resume stays as a fallback. `source_callback` in
+`/tmp/quiet-home-state.txt` records the registration result.
+
 ## Stored settings
 
 The service behind the library keeps its data in the vconf key

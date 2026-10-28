@@ -53,8 +53,9 @@ Public source cards are neutral text placeholders;
 
 The Home page builds one card per connected input from `get_source_list()` in
 Samsung's `libsource-api.so`, and switches with the returned `sourceType`.
-The name and icon come from the TV; a name set in Samsung's source list wins,
-and an unnamed input shows the HDMI number from its icon. This is a private
+The cards follow devices being plugged in or removed. The name and icon come
+from the TV; a name set in Samsung's source list wins, and an unnamed input
+shows the HDMI number from its icon. This is a private
 platform interface: its availability, fields and memory ownership may differ
 by model and firmware. If the call fails, the page says no inputs were found;
 select an input from the native menu. The **Edit inputs** button at the top

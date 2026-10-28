@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
 using Tizen.Applications;
@@ -27,6 +28,11 @@ public sealed class QuietHome : NUIApplication
  string libraryError="";
  List<InputSource> inputSources=new List<InputSource>();
  string inputError="";
+ // The TV calls this from its own thread; the delegate stays referenced while registered.
+ [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void SourceListChanged(int what,IntPtr data);
+ static readonly IntPtr SourceCallbackToken=new IntPtr(0x5157);
+ SourceListChanged sourceListChanged;
+ int sourceCallback=-1;
  TextLabel clock, notice, detail;
  TextLabel[] tabs;
  TextLabel toolbarHint;
@@ -49,6 +55,8 @@ public sealed class QuietHome : NUIApplication
  readonly Color white=new Color(1,1,1,1);
  [DllImport("libsource-api.so")] static extern int connect_source(int sourceType);
  [DllImport("libsource-api.so")] static extern IntPtr get_source_list();
+ [DllImport("libsource-api.so")] static extern int register_sourcelist_changed_callback(SourceListChanged cb,IntPtr data);
+ [DllImport("libsource-api.so")] static extern int unregister_sourcelist_changed_callback(IntPtr data);
  [DllImport("libc.so.6")] static extern void free(IntPtr p);
  [DllImport("libvconf.so.0")] static extern int vconf_get_int(string key,out int value);
  [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_create(out IntPtr app);
@@ -75,6 +83,7 @@ public sealed class QuietHome : NUIApplication
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   // Samsung Home's source editor opens over this window without pausing it; reread the inputs on return.
   Window.Default.FocusChanged+=(s,e)=>{if(e.FocusGained){RefreshInputCards();WriteState("focus_gained");}};
+  WatchSources();
   PreloadArtwork();
   RefreshSource();selected=SourceIndex();BuildPage();
   clockTimer=new Tizen.NUI.Timer(30000);
@@ -170,6 +179,14 @@ public sealed class QuietHome : NUIApplication
   UpdateFocus(false);
   buildMilliseconds=stopwatch.ElapsedMilliseconds;WriteState("page_ready");
  }
+ // Connecting or unplugging a device redraws the input cards; 0 meant success on the QE65S95F.
+ void WatchSources()
+ {
+  var ui=SynchronizationContext.Current;if(ui==null)return;
+  sourceListChanged=(what,data)=>ui.Post(_=>{RefreshInputCards();WriteState("sources_changed");},null);
+  try{sourceCallback=register_sourcelist_changed_callback(sourceListChanged,SourceCallbackToken);}catch{sourceCallback=-2;}
+ }
+ protected override void OnTerminate(){if(sourceCallback==0)try{unregister_sourcelist_changed_callback(SourceCallbackToken);}catch{}base.OnTerminate();}
  void RefreshInputCards(){if(tabs!=null&&page==0&&editing==""&&RefreshInputSources())BuildPage();}
  void BuildInputs()
  {
@@ -436,6 +453,6 @@ public sealed class QuietHome : NUIApplication
    if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
  }
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
+ void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
  public static void Main(string[] args){using(var app=new QuietHome())app.Run(args);}
 }
