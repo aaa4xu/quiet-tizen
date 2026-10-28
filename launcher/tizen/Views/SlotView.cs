@@ -25,12 +25,9 @@ sealed class SlotView
     /// <summary>The shadow under the card, brighter while focused; null when the card has none.</summary>
     public View? Shadow { get; init; }
 
-    /// <summary>The accent ring shown on a focused app card; null for other cards.</summary>
-    public View? FocusRing { get; init; }
+    /// <summary>The ring around the focused card (see <see cref="FocusStyle.AddRing"/>).</summary>
+    public View? Ring { get; init; }
 
-    /// <summary>
-    /// The card's text that changes with focus: the name under input and app cards (bolder
-    /// while focused) or the value on a Settings tile. Null when there is none.
-    /// </summary>
-    public TextLabel? Label { get; init; }
+    /// <summary>The value line of a Settings tile, which changes without a rebuild; null for other cards.</summary>
+    public TextLabel? Value { get; init; }
 }

@@ -1,6 +1,4 @@
 using QuietHome.Core.Screens;
-using Tizen.NUI;
-using Tizen.NUI.BaseComponents;
 
 namespace QuietHome.TizenHost.Views;
 
@@ -41,17 +39,8 @@ static class AppsPageView
         var card = scene.Card(x + w / 2, y + h / 2, w, h, color, 18);
         if (AppArtwork.Fill(card, app, w, h, canvas.Artwork, palette))
             canvas.ColdArtwork++;
-        var ring = new View
-        {
-            Size2D = new Size2D(w, h),
-            BackgroundColor = ViewPalette.Clear(),
-            CornerRadius = new Vector4(18, 18, 18, 18),
-            BorderlineWidth = 4,
-            BorderlineColor = palette.Accent,
-            Opacity = 0,
-        };
-        card.Add(ring);
-        var name = scene.Text(app.Name, new Box(x, y + h + Layout.AppNameGap, w, Layout.AppNameHeight), Layout.AppNameSize, palette.Ink, "Semibold");
-        canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, FocusRing = ring, Label = name });
+        var ring = FocusStyle.AddRing(card, w, h, 18, palette.Ink);
+        scene.Text(app.Name, new Box(x, y + h + Layout.AppNameGap, w, Layout.AppNameHeight), Layout.AppNameSize, palette.Ink);
+        canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, Ring = ring });
     }
 }

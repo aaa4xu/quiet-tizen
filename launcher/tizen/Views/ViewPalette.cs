@@ -25,13 +25,13 @@ sealed class ViewPalette
     /// <summary>True for the dark theme.</summary>
     public bool Dark { get; }
 
-    /// <summary>Main text and icon color.</summary>
+    /// <summary>Main text and icon color, and the focus ring around cards.</summary>
     public Color Ink { get; }
 
     /// <summary>Secondary text color.</summary>
     public Color Muted { get; }
 
-    /// <summary>Notice text and the focus ring of app cards.</summary>
+    /// <summary>Notice text.</summary>
     public Color Accent { get; }
 
     /// <summary>Highlight behind the focused tab.</summary>
@@ -61,8 +61,8 @@ sealed class ViewPalette
     /// <summary>Returns the hint color on Settings tiles.</summary>
     public static Color TileHint() => new(.95f, .96f, 1, 1);
 
-    /// <summary>Returns the white border of cards, stronger on the focused one.</summary>
-    public static Color CardBorder(bool focused) => new(1, 1, 1, focused ? .8f : .28f);
+    /// <summary>Returns the faint white border of cards.</summary>
+    public static Color CardBorder() => new(1, 1, 1, .28f);
 
     /// <summary>Converts a core color to NUI.</summary>
     public static Color ToColor(Rgba color) => new(color.R, color.G, color.B, color.A);

@@ -138,12 +138,13 @@ sealed class HomeView : IHomeView
         var card = scene.Card(x + size / 2, Layout.ToolbarY + size / 2, size, size, ViewPalette.Clear(), 34);
         card.Add(new ImageView { ResourceUrl = root + palette.Themed("glass-button.svg"), Position2D = new Position2D(-16, -16), Size2D = new Size2D(100, 112) });
         card.Add(new ImageView { ResourceUrl = root + "symbol-" + button.Icon + ".png", Color = palette.Ink, Position2D = new Position2D(19, 19), Size2D = new Size2D(30, 30) });
-        slots.Add(new SlotView(card, new Box(x, Layout.ToolbarY, size, size)));
+        var ring = FocusStyle.AddRing(card, size, size, size / 2, palette.Ink);
+        slots.Add(new SlotView(card, new Box(x, Layout.ToolbarY, size, size)) { Ring = ring });
     }
 
     /// <summary>
-    /// Shows which element has the focus: the current tab, each card's size, border, lift,
-    /// shadow, ring and name weight (see <see cref="FocusStyle"/>), the focused card on top,
+    /// Shows which element has the focus: the current tab, each card's size, border, shadow
+    /// and ring (see <see cref="FocusStyle"/>), the focused card on top,
     /// and the clock, toolbar hint, detail line and Settings values. With
     /// <paramref name="animate"/> cards move there in a short animation.
     /// </summary>
@@ -173,7 +174,7 @@ sealed class HomeView : IHomeView
             detail.Text = chrome.Detail;
         for (int i = 0; i < slots.Count && i < cards.Count; i++)
         {
-            if (cards[i] is SettingsTileModel tile && slots[i].Label is TextLabel value)
+            if (cards[i] is SettingsTileModel tile && slots[i].Value is TextLabel value)
                 value.Text = tile.Value;
         }
     }
@@ -183,29 +184,28 @@ sealed class HomeView : IHomeView
     {
         bool focused = card.Focused;
         var style = FocusStyle.For(card);
-        float scale = focused ? style.Scale : 1;
-        slot.Card.BorderlineWidth = focused ? style.FocusedBorder : style.Border;
-        slot.Card.BorderlineColor = style.AccentBorder && focused ? palette.Accent : ViewPalette.CardBorder(focused);
-        var box = slot.Box;
-        var position = new Position(box.X + box.W / 2f, box.Y + box.H / 2f - (focused ? style.Lift : 0), 0);
+        float scale = focused ? style.Scale(slot.Box.H) : 1;
+        slot.Card.BorderlineWidth = style.Border;
+        slot.Card.BorderlineColor = ViewPalette.CardBorder();
         if (animation != null)
-        {
             animation.AnimateTo(slot.Card, "Scale", new Vector3(scale, scale, 1));
-            animation.AnimateTo(slot.Card, "Position", position);
-        }
         else
-        {
             slot.Card.Scale = new Vector3(scale, scale, 1);
-            slot.Card.Position = position;
-        }
         if (slot.Shadow != null)
-            slot.Shadow.Opacity = focused ? 1 : .55f;
-        if (slot.FocusRing != null)
-            slot.FocusRing.Opacity = focused ? 1 : 0;
-        if (slot.Label != null && style.BoldName)
-            slot.Label.FontFamily = Scene.Font(focused ? "Semibold" : "Medium");
+            Fade(slot.Shadow, focused ? 1 : .55f, animation);
+        if (slot.Ring != null)
+            Fade(slot.Ring, focused ? 1 : 0, animation);
         if (focused)
             slot.Card.RaiseToTop();
+    }
+
+    /// <summary>Sets <paramref name="view"/>'s opacity, through <paramref name="animation"/> when there is one.</summary>
+    static void Fade(View view, float opacity, Animation? animation)
+    {
+        if (animation != null)
+            animation.AnimateTo(view, "Opacity", opacity);
+        else
+            view.Opacity = opacity;
     }
 
     /// <summary>Stops and frees a focus animation still running.</summary>

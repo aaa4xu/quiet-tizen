@@ -8,13 +8,13 @@ namespace QuietHome.Core.Theme;
 /// </summary>
 public sealed class ThemeColors
 {
-    /// <summary>Main text: page titles, card names, the selected tab.</summary>
+    /// <summary>Main text: page titles, card names, the selected tab; also the focus ring around cards.</summary>
     public Rgba Ink { get; }
 
     /// <summary>Secondary text: unselected tabs, the clock, hints.</summary>
     public Rgba Muted { get; }
 
-    /// <summary>Focus ring on app cards and the error line.</summary>
+    /// <summary>The notice line.</summary>
     public Rgba Accent { get; }
 
     /// <summary>Pill behind the selected tab while the tabs have focus.</summary>

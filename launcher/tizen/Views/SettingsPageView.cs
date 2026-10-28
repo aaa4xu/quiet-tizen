@@ -11,7 +11,7 @@ namespace QuietHome.TizenHost.Views;
 /// </summary>
 static class SettingsPageView
 {
-    /// <summary>Adds one tile per model tile and a slot whose label is the tile's value line.</summary>
+    /// <summary>Adds one tile per model tile, with its focus ring, and a slot that holds the tile's value line.</summary>
     public static void Build(PageCanvas canvas, SettingsPageModel page)
     {
         foreach (var model in page.Tiles)
@@ -25,7 +25,8 @@ static class SettingsPageView
             var value = Scene.Label("", Layout.TileValue, Layout.TileValueSize, ViewPalette.White(), "Display");
             card.Add(value);
             card.Add(Scene.Label(tile.Hint, Layout.TileHint, Layout.TileHintSize, ViewPalette.TileHint()));
-            canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Label = value });
+            var ring = FocusStyle.AddRing(card, w, h, 24, canvas.Palette.Ink);
+            canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Ring = ring, Value = value });
         }
     }
 }

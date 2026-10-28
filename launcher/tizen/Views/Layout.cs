@@ -125,13 +125,13 @@ static class Layout
     public const int AppWidth = 328, AppHeight = 184;
 
     /// <summary>Distance between the left edges of neighbouring app cards, and between rows.</summary>
-    public const int AppColumnStep = 358, AppRowStep = 245;
+    public const int AppColumnStep = 358, AppRowStep = 253;
 
     /// <summary>Top edge of the first row of app cards.</summary>
     public const int AppTop = 266;
 
     /// <summary>Gap between an app card and its name, height of the name and its font size.</summary>
-    public const int AppNameGap = 14, AppNameHeight = 38;
+    public const int AppNameGap = 13, AppNameHeight = 38;
 
     /// <summary>Font size of the app name under its card.</summary>
     public const float AppNameSize = 27;

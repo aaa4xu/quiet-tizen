@@ -58,9 +58,10 @@ static class HomePageView
                     FittingMode = FittingModeType.ShrinkToFit,
                 });
             }
-            var name = scene.Text(input.Name, new Box(x, Layout.InputNameY, w, Layout.InputNameHeight), Layout.InputNameSize, palette.Ink, "Semibold");
+            var ring = FocusStyle.AddRing(card, w, h, 18, palette.Ink);
+            scene.Text(input.Name, new Box(x, Layout.InputNameY, w, Layout.InputNameHeight), Layout.InputNameSize, palette.Ink);
             scene.Text(input.Text, new Box(x, Layout.InputTextY, w, Layout.InputTextHeight), Layout.InputTextSize, palette.Muted);
-            canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, Label = name });
+            canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, Ring = ring });
         }
     }
 
@@ -86,6 +87,7 @@ static class HomePageView
         {
             card.Add(new ImageView { ResourceUrl = canvas.Root + "free-dock-apps.svg", Size2D = new Size2D(w, h) });
         }
-        canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow });
+        var ring = FocusStyle.AddRing(card, w, h, 22, canvas.Palette.Ink);
+        canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, Ring = ring });
     }
 }
