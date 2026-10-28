@@ -56,7 +56,7 @@ def main():
         if local_catalog.exists():
             shutil.copyfile(local_catalog, assets / "apps.json")
         (assets / "apps.local.json").unlink(missing_ok=True)
-        print("Deployable files: .local/package/. Review the catalog and input mapping before use.")
+        print("Deployable files: .local/package/. Review the app catalog before use.")
 
 
 if __name__ == "__main__":

@@ -35,8 +35,8 @@ are automatically stored in ignored `.local/sessions/`.
 Record current Home/startup preferences, then use the compiled Probe described
 in the launcher guide to read the main-operation Home handler and actual input
 source list. On our TV, HDMI 1/2/3 mapped to 13/14/15. **Do not infer that mapping
-for another model.** The shipped UI has example PlayStation and Switch labels;
-edit them to match the owner's connected devices.
+for another model.** Quiet Home builds its input cards from the TV's own
+source list; check that list on the owner's TV.
 
 Inventory service unit definitions before creating stop markers:
 

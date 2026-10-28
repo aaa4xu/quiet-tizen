@@ -5,8 +5,8 @@ routing adjusted to make it act as the launcher. It does not replace the
 kernel or the whole Tizen shell. Samsung's settings, app framework and media
 stack remain available underneath.
 
-The design follows Free My TV: light background, wide feature card, two
-portrait cards, colorful tiles, rounded controls and a translucent dock.
+The design follows Free My TV: input cards, colorful tiles, rounded controls
+and a translucent dock.
 All UI text here is English. See [attribution](../NOTICE.md).
 
 ## Obtain matching private framework references
@@ -51,20 +51,27 @@ Public source cards are neutral text placeholders;
 
 ## Adapt inputs and apps
 
-The original UI uses HDMI 2 as the wide PlayStation 5 card, HDMI 3 as the
-Switch card, and HDMI 1 as the third card. Source IDs 14, 15 and 13 were observed
-on the tested TV. They are example wiring, not auto-discovery.
+The Home page builds one card per connected input from `get_source_list()` in
+Samsung's `libsource-api.so`, and switches with the returned `sourceType`.
+The name and icon come from the TV; a name set in Samsung's source list wins,
+and an unnamed input shows the HDMI number from its icon. This is a private
+platform interface: its availability, fields and memory ownership may differ
+by model and firmware. If the call fails, the page says no inputs were found;
+select an input from the native menu.
 
-Upload and run Probe to inspect sources and the current main-operation handler:
+On the QE65S95F (`T-RSMFDEUC-0090-1301.0`) the call returned a JSON array
+allocated with `malloc`: Live TV (`sourceType` 0), a PlayStation 5 (14) and an
+unnamed HDMI 3 (15), each with an icon from `com.samsung.tv.theme-resource`.
+A `QN55S90FAFXZA` returned Live TV and one HDMI device (16).
+
+Upload and run Probe to inspect the current main-operation handler:
 
 ```sh
 tv push .local/build/Probe/Probe.dll Probe.dll
 tv exec --command '/usr/bin/dotnet /home/owner/share/tmp/sdk_tools/quiet-tizen/Probe.dll'
 ```
 
-Edit labels, source actions, `RefreshSource`, `SourceIndex` and the default
-`lastSource` in `launcher/src/Home.cs` to match the actual devices. The library
-is read from `apps.json`; verify all app IDs against the TV. See
+The library is read from `apps.json`; verify all app IDs against the TV. See
 [app configuration](06-artwork.md). Rebuild after source changes.
 
 ## Install without changing Home yet
@@ -142,7 +149,7 @@ the original backup. The snapshot and backup folder is
 Verify visibly:
 
 - All pages render; the D-pad, Select and Back behave correctly.
-- HDMI cards switch the intended input, with picture and audio.
+- Input cards show the connected devices and switch to them, with picture and audio.
 - Volume/mute and applicable quick settings work.
 - Native Advanced and Network settings still open.
 - Chosen app shortcuts launch the correct installed apps.
