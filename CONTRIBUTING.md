@@ -23,7 +23,13 @@ For local checks:
 python3 -m unittest discover -s tests -v
 python3 tools/build.py payloads
 dotnet test tests/QuietHome.Core.Tests
+dotnet format launcher/core/QuietHome.Core.csproj --verify-no-changes
+dotnet format tests/QuietHome.Core.Tests --verify-no-changes
 ```
+
+New or rewritten C# needs a comment on every class and interface explaining
+its place in the architecture, and on every method saying what it does; see
+"C# code" in AGENTS.md.
 
 NUI changes also need a build against matching private references and a
 clearly stated hardware-test status. Keep attribution/license files with

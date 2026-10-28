@@ -1,1 +1,6 @@
 *.sh text eol=lf
+# C# and MSBuild files: dotnet format checks line endings against .editorconfig on every OS.
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf

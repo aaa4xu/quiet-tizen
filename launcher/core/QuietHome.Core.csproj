@@ -4,5 +4,8 @@
   <Import Project="CoreCompile.props" />
   <PropertyGroup>
     <OutputType>Library</OutputType>
+    <!-- Every public type and member needs a /// comment (AGENTS.md, "C# code"); the build fails without one. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
   </PropertyGroup>
 </Project>

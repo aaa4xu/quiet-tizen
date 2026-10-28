@@ -68,6 +68,23 @@ session; allow its cleanup checks to complete first.
 - Do not claim every privacy path is eliminated. No decrypted traffic audit
   of this exact TV was performed. See docs/08-privacy.md.
 
+## C# code
+
+New or substantially rewritten C# (`launcher/core`, `tests/QuietHome.Core.Tests`
+and whatever is taken out of `launcher/tizen/Home.cs`) must be clear to a
+reader who sees only that file, including an agent on a much simpler model.
+
+- Every class, struct, interface and enum has a `///` comment on its place in
+  the app's architecture: its layer (core logic, platform port, Tizen
+  implementation, view, test), what uses it and what it relies on.
+- Every method, private ones and tests included, has a comment that says at a
+  high level what it does and what it returns, not how.
+- The build enforces this only for public members of the core and test
+  projects (CS1591 is an error there); check the rest in review.
+
+The dense existing code in `Home.cs`, `QuickLaunch.cs` and `Probe.cs` is
+exempt until it is rewritten.
+
 ## Local data and publication
 
 Use `.local/` for device-specific plans, raw command output, screenshots,

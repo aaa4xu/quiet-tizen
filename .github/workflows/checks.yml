@@ -28,3 +28,7 @@ jobs:
         run: python tools/build.py payloads
       - name: Test Quiet Home logic without Samsung references
         run: dotnet test tests/QuietHome.Core.Tests
+      - name: Check C# formatting against .editorconfig
+        run: |
+          dotnet format launcher/core/QuietHome.Core.csproj --verify-no-changes
+          dotnet format tests/QuietHome.Core.Tests --verify-no-changes
