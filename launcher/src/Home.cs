@@ -162,10 +162,9 @@ public sealed class QuietHome : NUIApplication
   }
   if(page==0){
   Add(new ImageView{ResourceUrl=Root+Themed("glass-shelf.svg"),Position2D=new Position2D(0,784),Size2D=new Size2D(1920,280)});
-  Dock("Netflix","app:org.tizen.netflix-app","netflix",0);
-  Dock("YouTube","app:com.samsung.tv.cobalt-yt","youtube",1);
-  Dock("Prime Video","app:org.tizen.primevideo","prime",2);
-  Dock("Your Apps","page:1","apps",3);
+  var dock=DockApps();
+  for(int i=0;i<dock.Count;i++)Dock(dock[i].Name,"app:"+dock[i].Id,null,i);
+  Dock("Your Apps","page:1","apps",dock.Count);
   }
   // Samsung Home's source list edits an input's name and type (hold Select on it).
   if(page==0)Toolbar("Edit inputs","edit-inputs","tv_settings",-1);
@@ -262,9 +261,7 @@ public sealed class QuietHome : NUIApplication
   artworkPreloadRoot=new View{Size2D=new Size2D(1920,1080),Opacity=0};
   Window.Default.Add(artworkPreloadRoot);
   foreach(var app in library)if(!app.Utility)GetArtwork(app,328,184);
-  foreach(var id in new[]{"org.tizen.netflix-app","com.samsung.tv.cobalt-yt","org.tizen.primevideo"}){
-   var app=library.Find(a=>a.Id==id);if(app!=null)GetArtwork(app,253,126);
-  }
+  foreach(var app in DockApps())GetArtwork(app,253,126);
  }
  CachedArtwork GetArtwork(LibraryApp app,int w,int h)
  {
@@ -320,6 +317,8 @@ public sealed class QuietHome : NUIApplication
   card.Add(Label(description,26,226,370,34,20,new Color(.95f,.96f,1,1)));
   slots.Add(new Slot{Card=card,Label=value,Name=name,Action=action,Description=description,Row=row,X=x,Y=y,W=w,H=h});
  }
+ // The dock holds the catalog's first five apps, then Your Apps.
+ List<LibraryApp> DockApps(){var apps=library.FindAll(a=>!a.Utility);return apps.GetRange(0,Math.Min(5,apps.Count));}
  void Dock(string label,string action,string asset,int n)
  {
   int x=(int)Math.Round(80+n*(253.333+48));

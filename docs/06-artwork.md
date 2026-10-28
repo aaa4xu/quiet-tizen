@@ -6,7 +6,8 @@ an app, create a subscription or install an Android APK.
 The example catalog includes Netflix, YouTube, Prime Video, HBO Max, Disney+,
 Hulu, Spotify, Apple TV, Tubi, Amazon Luna and Xbox. App IDs vary across regions,
 releases and packages. Match IDs against the current TV's metadata, then
-test each shortcut.
+test each shortcut. The Home page's dock shows the catalog's first five apps,
+so order the entries accordingly.
 
 Copy `launcher/assets/apps.json` to the ignored
 `launcher/assets/apps.local.json` to customize it. Entries contain a name,
