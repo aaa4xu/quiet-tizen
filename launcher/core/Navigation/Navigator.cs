@@ -204,6 +204,8 @@ public sealed class Navigator
     /// <summary>
     /// Moves focus one zone down: toolbar or tabs → first row (or the second row when the
     /// first is empty), first row → second row (same column on Settings, else the first card).
+    /// From the Home tab the focus goes to the input card <see cref="Selected"/> names, which
+    /// the controller sets to the input on screen; otherwise to the row's first card.
     /// </summary>
     void MoveDown(SlotRows rows)
     {
@@ -214,8 +216,11 @@ public sealed class Navigator
         }
         else if (Zone == Zone.Tabs || Zone == Zone.Toolbar)
         {
+            // On Home the input card already shown widened (the input on screen) gets the focus.
+            bool keep = Page == Page.Home && Zone == Zone.Tabs && rows.Row(0).Contains(Selected);
             Zone = Zone.FirstRow;
-            Selected = rows.Row(0)[0];
+            if (!keep)
+                Selected = rows.Row(0)[0];
         }
         else if (Zone == Zone.FirstRow)
         {

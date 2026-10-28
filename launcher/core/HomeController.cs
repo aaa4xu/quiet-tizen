@@ -50,10 +50,11 @@ public sealed class HomeController
     bool dark = true;
     string themeError = "";
     int lastSource;
+    PreviewState preview;
 
     /// <summary>
-    /// Creates the controller and subscribes to the TV's input changes. Nothing is shown
-    /// until <see cref="Start"/>.
+    /// Creates the controller and subscribes to the TV's input changes and preview failures.
+    /// Nothing is shown until <see cref="Start"/>.
     /// </summary>
     public HomeController(HomePorts tv, IHomeView view, HomeConfig config)
     {
@@ -62,6 +63,7 @@ public sealed class HomeController
         this.config = config;
         demoInputs = new DemoInputSources(tv.Inputs, config.DemoInputs);
         tv.Inputs.Changed += SourcesChanged;
+        tv.Preview.Failed += PreviewFailed;
         view.ArtworkLoaded += ArtworkLoaded;
     }
 
@@ -84,8 +86,8 @@ public sealed class HomeController
     IClock Clock => demo ? demoClock : tv.Clock;
 
     /// <summary>
-    /// Starts the app: loads the owner's catalog and theme, starts loading artwork and shows
-    /// the Home page with the input on screen focused.
+    /// Starts the app: loads the owner's catalog and theme, starts loading artwork, shows
+    /// the Home page with the input on screen focused and mutes the input's sound.
     /// </summary>
     public void Start()
     {
@@ -103,12 +105,18 @@ public sealed class HomeController
         RefreshSource();
         navigator.Selected = SourceIndex();
         Rebuild();
+        SilenceInput();
         WriteState("created");
     }
 
-    /// <summary>The app came back to the foreground: rereads the input on screen and the inputs, and the settings on the Settings page.</summary>
+    /// <summary>
+    /// The app came back to the foreground: mutes the input's sound, rereads the input on
+    /// screen and the inputs, and the settings on the Settings page; on the Home page the
+    /// input preview comes back.
+    /// </summary>
     public void Resume()
     {
+        SilenceInput();
         RefreshSource();
         RefreshInputCards();
         if (builtPage != null && navigator.Page == Page.Settings)
@@ -116,13 +124,18 @@ public sealed class HomeController
             RefreshSettings();
             Render(RenderMode.Refresh);
         }
+        else if (builtPage == Page.Home)
+        {
+            Render(RenderMode.Refresh);
+        }
         WriteState("resumed");
     }
 
-    /// <summary>The app went to the background: an adjustment in progress ends.</summary>
+    /// <summary>The app went to the background: an adjustment in progress ends, and the TV gets its picture and sound back.</summary>
     public void Pause()
     {
         navigator.Adjusting = Adjustment.None;
+        ReleaseScreen(true);
         WriteState("paused");
     }
 
@@ -145,12 +158,13 @@ public sealed class HomeController
 
     /// <summary>
     /// The TV launched the app again with <paramref name="options"/> (Home key, QuickLaunch,
-    /// README screenshots): applies demo mode and theme, then shows the asked page, focused on
-    /// its first toolbar button when the options ask for it.
+    /// README screenshots): applies demo mode and theme, mutes the input's sound, then shows
+    /// the asked page, focused on its first toolbar button when the options ask for it.
     /// </summary>
     public void AppControl(LaunchOptions options)
     {
         bool changed = ApplyLaunchOptions(options);
+        SilenceInput();
         if (options.Page == Page.Settings)
         {
             OpenSettings("settings_request");
@@ -208,6 +222,9 @@ public sealed class HomeController
                     Render(RenderMode.AnimateFocus);
                     break;
                 case KeyOutcome.Rebuild:
+                    // Arriving at Home through the tabs: the input on screen is the card shown wide.
+                    if (navigator.Page == Page.Home && navigator.Zone == Zone.Tabs)
+                        navigator.Selected = SourceIndex();
                     Rebuild();
                     break;
                 case KeyOutcome.Activate:
@@ -231,10 +248,12 @@ public sealed class HomeController
             view.ShowClock(ClockNow());
     }
 
-    /// <summary>The app is ending: stops listening to the TV's input changes.</summary>
+    /// <summary>The app is ending: gives the TV its picture and sound back and stops listening to it.</summary>
     public void Terminate()
     {
+        ReleaseScreen(true);
         tv.Inputs.Changed -= SourcesChanged;
+        tv.Preview.Failed -= PreviewFailed;
         view.ArtworkLoaded -= ArtworkLoaded;
     }
 
@@ -393,6 +412,7 @@ public sealed class HomeController
         view.Render(screen, RenderMode.Rebuild);
         builtPage = navigator.Page;
         inputsFresh = false;
+        UpdatePreview();
         WriteState("page_ready");
     }
 
@@ -401,7 +421,101 @@ public sealed class HomeController
     {
         screen = BuildScreen();
         view.Render(screen, mode);
+        UpdatePreview();
         WriteState("focus");
+    }
+
+    /// <summary>
+    /// Asks for the live picture of the input card shown wide (focused, or the one Down
+    /// would focus from the Home tab), or puts the preview away when there is none to
+    /// preview. Only the card of the input on screen gets one: its
+    /// picture is already there, so the TV changes no source, HDR or game mode for it, while
+    /// previewing another input switched those modes on every focus move. Live TV gets none
+    /// (without an antenna the TV covers the screen with its notice), nor does demo mode,
+    /// nor any card after the TV refused a preview.
+    /// </summary>
+    void UpdatePreview()
+    {
+        if (preview == PreviewState.Unsupported)
+            return;
+        int slot = navigator.Selected;
+        bool previewable = !demo && builtPage == Page.Home && navigator.Page == Page.Home
+            && (navigator.Zone == Zone.FirstRow || navigator.Zone == Zone.Tabs)
+            && navigator.Adjusting == Adjustment.None && slot >= 0 && slot < inputSources.Count
+            && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource;
+        if (!previewable)
+        {
+            HidePreview();
+            return;
+        }
+        preview = PreviewState.On;
+        try
+        {
+            tv.Preview.Show(inputSources[slot].SourceType, slot);
+        }
+        catch (Exception)
+        {
+            PreviewFailed();
+        }
+    }
+
+    /// <summary>Puts a preview that was asked for away, giving the TV its full picture back.</summary>
+    void HidePreview()
+    {
+        if (preview != PreviewState.On)
+            return;
+        preview = PreviewState.Off;
+        try
+        {
+            tv.Preview.Hide();
+        }
+        catch (Exception)
+        {
+            // The port restores what it can; nothing else to do here.
+        }
+    }
+
+    /// <summary>
+    /// Quiet Home gives the screen up: any preview ends at once and the TV gets its
+    /// full-screen picture back, and with <paramref name="sound"/> the input's sound too.
+    /// </summary>
+    void ReleaseScreen(bool sound)
+    {
+        if (preview == PreviewState.On)
+            preview = PreviewState.Off;
+        try
+        {
+            tv.Preview.Release(sound);
+        }
+        catch (Exception)
+        {
+            // The port restores what it can.
+        }
+    }
+
+    /// <summary>
+    /// Mutes the input's sound while Quiet Home is in front, as Samsung's home does; it comes
+    /// back when Quiet Home gives the screen up. Demo mode leaves the TV's sound alone.
+    /// </summary>
+    void SilenceInput()
+    {
+        if (demo)
+            return;
+        try
+        {
+            tv.Preview.Silence();
+        }
+        catch (Exception)
+        {
+            // The sound simply stays on.
+        }
+    }
+
+    /// <summary>The TV refused a preview: no more are asked for this session; records it.</summary>
+    void PreviewFailed()
+    {
+        preview = PreviewState.Unsupported;
+        WriteState("preview_failed");
     }
 
     /// <summary>Performs the action of the focused element; any old notice is cleared first.</summary>
@@ -520,9 +634,13 @@ public sealed class HomeController
         WriteState("volume_changed");
     }
 
-    /// <summary>Switches the TV to input <paramref name="source"/> and opens its picture; a failure is shown and recorded.</summary>
+    /// <summary>
+    /// Switches the TV to input <paramref name="source"/> and opens its picture; a failure is
+    /// shown and recorded. The TV gets its full-screen picture and sound back first.
+    /// </summary>
     void SelectSource(int source)
     {
+        ReleaseScreen(true);
         int result = Inputs.Switch(source);
         if (result < 0)
         {
@@ -534,9 +652,14 @@ public sealed class HomeController
         Launch(LaunchRequest.TvViewer);
     }
 
-    /// <summary>Opens another app and records the result; failures are shown.</summary>
+    /// <summary>
+    /// Opens another app and records the result; failures are shown. The TV gets its picture
+    /// back first; the input's sound only when Quiet Home goes to the background, so it does
+    /// not play while the app starts.
+    /// </summary>
     void Launch(LaunchRequest request)
     {
+        ReleaseScreen(false);
         var result = tv.Launcher.Launch(request);
         if (!result.Created)
         {
@@ -592,6 +715,7 @@ public sealed class HomeController
                 Brightness = settings.Value("brightness"),
                 GameMode = settings.Value(settings.GameModeId),
                 SleepTimer = settings.Value("sleeptimer"),
+                Preview = preview,
             }.Format(DateTime.UtcNow));
         }
         catch (Exception)

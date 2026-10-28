@@ -1,10 +1,11 @@
 # HDMI input preview on the home screen
 
 This note explains how a Samsung TV puts a live HDMI picture on its own home
-screen, and how to add the same thing to Quiet Home. The findings come from a
-QE65S95FAUXRU on `T-RSMFDEUC-0090-1301.0` (Tizen 9, 32-bit ARM userland) unless
-another model is named. The API is private: check the exports and behaviour on
-your own TV before relying on them.
+screen, and how Quiet Home shows the input on screen inside its card. The
+findings come from one TV, a QE65S95FAUXRU on `T-RSMFDEUC-0090-1301.0` (Tizen 9,
+32-bit ARM userland), unless another model is named; no other model was tested.
+The API is private: check the exports and behaviour on your own TV before
+relying on them.
 
 ## What the TV actually draws
 
@@ -127,254 +128,186 @@ preview card. It is the least code and the easiest to validate.
 
 ### B. A live preview inside an input card
 
-This is the feature Quiet Home's Home page is shaped for: the focused HDMI
-card shows the input, while the rest of the page keeps its normal background.
+This is what Quiet Home does. It previews only the input that is already on
+screen: the TV's main video plane already plays that input, so the launcher
+only moves the plane into the card. Previewing any other input switches the
+TV's source or pipeline and, with it, the picture mode of the whole screen
+(see the findings below), so Quiet Home does not do it.
 
-1. Connect the video plane to the launcher window once with
-   `SetXWindow((uint)windowId)`.
-2. On a focus move, call
-   `SetPreviewSource((Source)input.SourceType, appId)` for the focused input,
-   then `SetSize(cardX, cardY, cardH, cardW)` to place the plane at that card.
-3. Draw the card as a frame: keep its border, focus ring and the name/text
-   below it, but leave the card's interior unpainted and do not put the icon
-   inside it. The video plane fills that rectangle.
-4. When the focus leaves the inputs, the page changes, the app is paused or an
-   app is launched, call `StopPreviewSource()` and `SetXWindow(0)`.
+1. Make the window transparent once, when the app starts
+   (`Window.SetTransparency(true)`). The pages cover the whole window, so
+   nothing else changes, and switching it later resets the plane.
+2. When the card of the input on screen is shown wide, tie the main plane to
+   the window and place it with `SetXWindowSize(windowId, x, y, h, w)`, then
+   `SetSize(x, y, h, w)`.
+3. Cut a see-through hole the shape of the card into the window (below) once
+   the size holds.
+4. When the focus leaves the card or the page changes, close the hole first,
+   then one frame later call `SetSize(0, 0, 1080, 1920)` and `SetXWindow(0)`.
+5. Before opening an input or app, do step 4 at once and wait 0.5 s after
+   `SetXWindow(0)` before the input switch. Mute the input's sound with
+   `IAVControl.MuteAudio(1)` while the launcher is in front and turn it back on
+   with `MuteAudio(0)` when an input opens or the launcher goes to the
+   background.
 
-Whether the video plane is composited above or below the NUI layer decides how
-much of the card you may paint. If it is above the UI, any text or icon inside
-the rectangle is hidden; if it is below, an opaque card background hides the
-video. Leaving the rectangle unpainted and keeping the labels outside it works
-in both cases. Verify the stacking on the TV with a bright test frame before
-committing to a visual design.
+## Findings on the QE65S95F
 
-Only one preview source can be shown at a time, so preview the focused card
-only. `SetPreviewSource` is a preview, not a source switch: the main picture
-and audio of the TV are not changed. Check whether the preview carries audio on
-your model; if it does, mute it with `IAVControl.MuteAudio(1)` while the
-preview is visible and restore `0` on hide.
+**All of the following was observed on one TV only: a QE65S95FAUXRU on
+firmware `T-RSMFDEUC-0090-1301.0`, on 28–29 October 2026,** with a PlayStation 5
+on HDMI2 (`sourceType` 14, HDR, Game Mode), a PC on HDMI3 (15, SDR), no antenna
+on Live TV (0), from Quiet Home in the `com.samsung.tv.adplayer` container.
+The owner watched the screen; screenshots cannot show the video plane. Treat
+every point as a hypothesis on another model or firmware.
 
-## Adding it to Quiet Home
+The calls below all returned `1` (the TV service's success code) unless a
+point says otherwise.
 
-The launcher separates the core (no Tizen references) from the TV host. Keep
-the decision in the core and the TV calls in the host, as
+### The plane and the window
+
+- **The plane is below the UI.** With the normal opaque window nothing of the
+  preview is visible. With the window transparent and the views hidden, the
+  input shows. A half-transparent view over the picture blends with it, so a
+  focus ring or a scrim may overlap the picture.
+- **A hole works.** A view with a custom `Renderer` whose blend mode is off and
+  whose fragment shader writes `vec4(0.0)` inside a rounded rectangle (and
+  discards outside its corners) replaces the window's pixels with transparent
+  ones, the way the underlay of DALi's `VideoView` does. The picture shows
+  through it with rounded corners; everything else stays. Quiet Home's version
+  is `launcher/tizen/Views/PreviewHole.cs`.
+- **Coordinates are the window's 1920 × 1080**, in the order
+  `(x, y, height, width)`. A 16:9 rectangle keeps the picture's shape; any
+  other shape stretches it. Quiet Home therefore widens the card to 16:9.
+- **Switching the window's transparency resets the plane** to full screen about
+  0.1 s later, even with `SetXWindowSize`. Making the window transparent once
+  at start removed every reset; the demo frames stayed byte for byte the same.
+- **`SignalUpdateSizeInfo`** (subscribe through
+  `TVServiceAPI.CreateSignalSubscriber`) reports the plane's actual rectangle:
+  its `SignalData.ll` holds x, y, width and height as four 16-bit numbers,
+  lowest first. `GetSize` does not: it kept reporting the rectangle Quiet Home
+  had set while the picture was full screen.
+- **The plane keeps its size and window tie.** It stayed card-sized after Quiet
+  Home was restarted, and an input switch through the TV viewer showed the
+  input in the card's rectangle. `SetSize(0, 0, 1080, 1920)` and
+  `SetXWindow(0)` before anything else changes the picture prevent that.
+- **Opening an input right after `SetXWindow(0)` gave a black picture with
+  sound.** So did leaving the plane tied to the launcher's window (as
+  Samsung's home does before the TV viewer). Waiting 0.5 s after
+  `SetXWindow(0)` before the switch fixed it. The TV sends no
+  `SignalXWindowChanged` for the untie, only when the viewer ties the plane
+  about 1 s later, so Quiet Home waits for the notice and times out.
+- **Timing.** `SetSize` takes about 20–30 ms on the UI thread. Moving the plane
+  every frame would stall the UI; Quiet Home places it once, after the card's
+  focus animation. With these steps the picture appeared in its card about
+  0.6 s after the focus stopped, without a black or full-screen frame.
+
+### Previewing other inputs (not used)
+
+- **`SetPreviewSource` on the main profile** previews any input, including the
+  one on screen, in about 140–200 ms. It does switch the TV's main source
+  (`GetCurrentSourceInfo` reports the previewed input), with its sound, so
+  `MuteAudio(1)` was needed. It reset the plane's size and the mute after it
+  returned, and moving between the HDR PlayStation and the SDR PC made the
+  whole screen flicker as the TV changed its picture mode.
+- **After `StopPreviewSource` the input on screen was inactive**
+  (`IsActive` false) until it was selected again.
+- **The PIP profile** (`CreateSourceControl(Profile.PIP, 0)` with
+  `SetPreviewSource`, and a PIP video control tied to the same window) shows
+  another input without touching the main source, without sound and without
+  the screen flicker. But it takes the input away from the main pipeline (the
+  card of the input on screen went black, `IsActive` false until
+  `SetSource` on the main profile), and starting it switched the TV's Game
+  Mode off, with a second-long stutter, and on again when the PlayStation was
+  opened.
+- With either approach, moving the focus across an HDMI card on the way to
+  another started a preview and a mode switch. That is why Quiet Home
+  previews only the input on screen.
+- **Live TV without an antenna** showed a black rectangle and Samsung's
+  full-screen "antenna disconnected" background behind the window.
+
+### Sound
+
+- The main pipeline's sound plays under the launcher unless something mutes
+  it. Samsung's home mutes audio and video on resume (decompiled
+  `TVServiceController`). Quiet Home mutes with `MuteAudio(1)`.
+- The TV viewer did **not** turn that sound back on: the PlayStation opened
+  silent. Quiet Home calls `MuteAudio(0)` before opening an input and when it
+  goes to the background, not before starting an app (the input's sound
+  played for a couple of seconds while the app started).
+- `MuteAudio(1)` answers `0` when the sound is already muted.
+
+### Not solved
+
+- **After another app the card's preview is black.** The TV still reports the
+  input as active (`IsActive` true) but plays no picture until the input is
+  opened again.
+- Not checked: an HDMI input without a signal, an input unplugged while
+  previewed, a full restart and standby/wake with a preview on, and whether
+  the owner's own mute survives Quiet Home (`MuteAudio(0)` probably undoes it).
+
+## How Quiet Home implements it
+
+The decision is in the core and the TV calls are in the host, as
 [the launcher documentation](04-launcher.md#how-the-code-is-organized) asks.
 
-### 1. Get the framework assemblies
-
-Pull the two assemblies the preview needs from the TV into the private
-`.local/tv-framework/` directory; do not commit them and do not copy them into
-the package:
-
-```sh
-tv pull /usr/share/dotnet.tizen/framework/Tizen.TV.NUI.dll \
-  .local/tv-framework/Tizen.TV.NUI.dll
-tv pull /usr/share/dotnet.tizen/framework/Tizen.TV.Broadcast.TVService.dll \
-  .local/tv-framework/Tizen.TV.Broadcast.TVService.dll
-```
-
-The higher-level TV-window controls also need
-`Tizen.TV.NUI.VideoWindowControl.dll`, `Tizen.TV.Broadcast.TVWindowControl.dll`
-and `Tizen.TV.UI.SharedAPI.dll`; add them only if you use those classes. At
-run time the TV provides all of them from its framework directory.
-
-`tools/tv.py framework-pull` knows only the four assemblies Quiet Home
-already uses, and `tools/build.py` checks for the same four names. Extend both
-so a fresh checkout pulls and validates the new files too, or pull them by hand
-as above.
-
-### 2. Reference them without packaging them
-
-Add the references to `launcher/tizen/Home.csproj` with `Private=false`, next
-to the existing four:
-
-```xml
-<Reference Include="Tizen.TV.NUI">
-  <HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.NUI.dll</HintPath><Private>false</Private>
-</Reference>
-<Reference Include="Tizen.TV.Broadcast.TVService">
-  <HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.Broadcast.TVService.dll</HintPath><Private>false</Private>
-</Reference>
-```
-
-The container's package already exists; its manifest and Cynara privileges are
-what the app runs with, so do not add a new TPK.
-
-### 3. Add a port in the core
-
-Add `launcher/core/Platform/IInputPreview.cs`:
-
-```csharp
-/// <summary>
-/// Port for the TV's source-preview plane: shows one connected input in the
-/// rectangle of a Home card, or hides it. The host implements it with the TV
-/// framework; demo mode uses a no-op.
-/// </summary>
-public interface IInputPreview
-{
-    /// <summary>Shows <paramref name="input"/> in the rectangle of card
-    /// <paramref name="slot"/>; returns false when the TV refuses.</summary>
-    bool Show(InputSource input, int slot);
-
-    /// <summary>Stops the preview and disconnects the video plane.</summary>
-    void Hide();
-}
-```
-
-Pass it through `HomePorts`. Add a no-op `DemoInputPreview` under
-`Platform/Demo/` that returns `true`, and the same methods to the test stand-in
-`FakeTv`, recording `PreviewShown` and `PreviewHidden`.
-
-In `HomeController`, call `Show` only while the Home page is current and the
-focused card is a connected input whose `sourceType` maps to a `Source` value.
-Call `Hide` on every other focus, page change, app launch, `Pause` and
-`Terminate`. Remember a failed `Show` and stop retrying for the session, so a
-TV without the privilege does not log an exception on every key press.
-
-Add a scenario test under `tests/QuietHome.Core.Tests/Scenarios/` in the style
-of the existing remote-control tests:
-
-```csharp
-home.Open();
-home.Press(RemoteKey.Right);            // focus the game console (sourceType 14)
-Assert.Equal(14, home.Tv.PreviewShown);
-home.Press(RemoteKey.Right);            // next input: HDMI3 (sourceType 15)
-Assert.Equal(15, home.Tv.PreviewShown);
-home.Press(RemoteKey.Down);             // leave the inputs
-Assert.True(home.Tv.PreviewHidden);
-```
-
-The core decides, the host draws: these tests cannot see the video plane.
-
-### 4. Implement the host port
-
-Add `launcher/tizen/Platform/TizenInputPreview.cs` (the `Layout.InputRect`
-helper is described in the next step):
-
-```csharp
-using System;
-using Tizen.Applications;
-using Tizen.NUI;
-using Tizen.TV.Broadcast.TVService;
-using Tizen.TV.Broadcast.TVService.API.Interface;
-using Tizen.TV.Broadcast.TVService.Types;
-using Tizen.TV.NUI;
-
-/// <summary>
-/// The TV implementation of <see cref="IInputPreview"/>: connects the TV video
-/// plane to Quiet Home's window and asks TVService to preview one input in the
-/// focused card's rectangle. A missing privilege or a refused call turns the
-/// preview off for the session.
-/// </summary>
-sealed class TizenInputPreview : IInputPreview
-{
-    IVideoControl? video;
-    ISourceControl? source;
-    bool connected;
-
-    public bool Show(InputSource input, int slot)
-    {
-        try
-        {
-            video ??= TVServiceAPI.Instance().CreateVideoControl(Profile.Main, 0);
-            source ??= TVServiceAPI.Instance().CreateSourceControl(Profile.Main, 0);
-            if (!connected)
-            {
-                int id = Window.Default.GetResourceID();
-                if (video.SetXWindow((uint)id) != 1)
-                    return false;
-                connected = true;
-            }
-            var r = Layout.InputRect(slot);
-            if (video.SetSize(r.X, r.Y, r.H, r.W) != 1)
-                return false;
-            string appId = Application.Current.ApplicationInfo.ApplicationId;
-            return source.SetPreviewSource((Source)input.SourceType, appId) == 1;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    public void Hide()
-    {
-        try { source?.StopPreviewSource(); } catch (Exception) { }
-        try { if (connected) video?.SetXWindow(0); } catch (Exception) { }
-        connected = false;
-    }
-}
-```
-
-Notes on the calls:
-
-- `SetSize` takes `(x, y, height, width)`; passing the NUI width/height in the
-  usual order silently produces a transposed rectangle.
-- Keep `IVideoControl` and `ISourceControl` alive while the preview is used;
-  both are `IDisposable`. Dispose them in `OnTerminate` after `Hide`.
-- `Window.Default.GetResourceID()` is an extension method from
-  `Tizen.TV.NUI`; it throws when the internal platform privilege is missing.
-- `SetPreviewSource` returns `1` on success. A `0` or `-1` means the TV did not
-  take the request; fall back to the icon card.
-
-### 5. Draw the card as a frame
-
-`HomePageView.BuildInputs` currently draws a filled card and a centred icon.
-For the preview slot:
-
-- add `bool Preview` to `InputCardModel` and set it in `ScreenBuilder` for the
-  focused input card on the Home page;
-- in `HomePageView`, draw the card with a transparent background and skip the
-  centred icon when `Preview` is true; keep the shadow, border, focus ring and
-  the name/text lines below the card;
-- add `Layout.InputRect(int slot)` that returns the same `Box` the loop in
-  `HomePageView.BuildInputs` computes, so the host port and the view cannot
-  drift apart;
-- if the video plane turns out to be **below** the UI on the TV, the opaque
-  `free-background.svg` layer covers it. Draw the background as panels around
-  the preview rectangle (or make that layer transparent and paint the
-  surrounding area) so the rectangle stays unpainted.
-
-The demo build must not change: `DemoInputPreview` returns `true` without
-touching the TV, and the demo frames stay byte-for-byte identical.
-
-### 6. Report and fall back
-
-Add a `preview:` key at the end of `/tmp/quiet-home-state.txt` (for example
-`on`, `off` or `unsupported`) so the recipes and tools can tell whether the
-plane is active. Appending a key keeps the existing contract; do not reorder
-the old ones. When `Show` fails once, record `unsupported` and leave the icon
-cards exactly as they are today.
+- **Assemblies.** `tools/tv.py framework-pull` also pulls
+  `Tizen.TV.NUI.dll` and `Tizen.TV.Broadcast.TVService.dll` into
+  `.local/tv-framework/`, `tools/build.py` checks for them, and
+  `launcher/tizen/Home.csproj` references them with `Private=false`. They are
+  not committed or packaged; the TV provides them at run time. The
+  container's own manifest and Cynara privileges apply, so no new TPK is
+  needed.
+- **Core.** `Platform/IInputPreview` has `Show(sourceType, slot)`, `Hide()`,
+  `Release(sound)`, `Silence()` and a `Failed` event. `HomeController` asks for
+  a preview after every render while the card of the input on screen (other
+  than Live TV) is shown wide on the Home page, outside demo mode: focused, or
+  the card the Home tab leads to. It hides the preview on every other focus and
+  page change, releases the screen before an input or app opens and on `Pause`
+  and `Terminate`, and mutes the input when it comes to the front. After one
+  refused call it stops asking until the app restarts. The diagnostics file
+  ends with `preview=on|off|unsupported`. `Scenarios/PreviewScenarios` tests
+  this with the remote.
+- **Host.** `Platform/TizenInputPreview` waits until the card has settled,
+  then calls `TvVideoPlane` (the only class that touches the TV service types;
+  it is reached only inside `try` blocks, so a TV without those assemblies
+  just turns the preview off), undoes the TV's size resets as
+  `SignalUpdateSizeInfo` reports them and asks `HomeView` to open the hole
+  once the size holds. `Layout.InputBox` widens the card to 786 × 442 and
+  narrows the others; `HomePageView.Place` animates them, and the picture's
+  rectangle is the card's, a few pixels larger, so its square corners stay
+  under the window. Every TV service call and size report is appended to
+  `/tmp/quiet-preview.txt` (it starts over past 64 KiB).
+- **Demo mode** never previews or mutes, so the demo frames show the cards as
+  drawn.
 
 ## Verify on the TV
 
 Build against the TV's own assemblies and install the build as usual
-(`docs/04-launcher.md`). Then check, with the remote and with `dlog`:
+(`docs/04-launcher.md`). Then check with the remote, and read
+`/tmp/quiet-preview.txt` for the calls and the TV's answers:
 
-- Focus an HDMI card: the card shows the input. Move the focus: the preview
-  follows or hides.
-- Leave the inputs for the dock, open Apps or Settings, launch an app, press
-  Home again, pause and resume: the preview appears and disappears with the
-  page.
-- Unplug the HDMI device: the input disappears from the source list; the card
-  falls back to its icon and the preview stops.
-- Full restart and standby/wake: no stale video plane, no black card.
-- `dlog -t TVService` and `dlog -t TVWindowControl` for refused calls. A
-  `MethodAccessException` means the container lacks
-  `internal/default/platform`.
-- The preview cannot be seen in `efl_util_screenshot`; use a camera, or capture
-  the video plane with `secvideo_api_capture_screen_video_only` from a root
-  session (see `.local/ambilight-findings.md`).
+- Home with an HDMI input on screen: its card is wide and shows the input
+  without sound; moving to the other cards changes no picture mode.
+- Select the card, and Back from Home: the input opens full screen with
+  picture and sound.
+- From Settings or Apps to the Home tab: the card of the input on screen is
+  wide with its preview; Down focuses it.
+- Open an app from the dock: no input sound while it starts.
+- Unplug the HDMI device, restart fully, standby and wake: no stale plane.
+- The preview cannot be seen in `efl_util_screenshot`; watch the screen, or
+  capture the video plane with `secvideo_api_capture_screen_video_only` from a
+  root session.
 
 ## Limits
 
-- The API is private and model/firmware-specific. Recheck the exports on a
-  different TV before reusing the code.
+- The API is private and model/firmware-specific; the findings above come
+  from one TV. Recheck them on a different TV before reusing the code.
 - The internal platform privilege is granted to in-house containers. A
   third-party container may not have it; the preview then stays off.
-- The TV may show the preview plane above the UI; do not put text or icons
-  inside the rectangle.
-- Only one input can be previewed at a time.
+- Only the input on screen is previewed; other cards keep their icons.
+- After another app the card stays black until the input is opened again.
+- The TV keeps the plane's size after the app; a crash between showing and
+  hiding a preview can leave the picture small until Quiet Home shows and
+  hides a preview again.
 - Do not build the preview from captured frames in the launcher:
   `libvideo-capture.so` works from a root session, is a snapshot API at about
   15–20 fps and is not part of the normal app path.

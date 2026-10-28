@@ -9,11 +9,11 @@ namespace QuietHome.Core.Tests.Fakes;
 /// <summary>
 /// A test stand-in for the TV: it implements every platform port the core's
 /// <see cref="HomeController"/> relies on (inputs, quick settings, theme file, clock at
-/// 6:05 PM, app launcher, diagnostics file) in memory. Tests set what the TV reports and
+/// 6:05 PM, app launcher, diagnostics file, input preview) in memory. Tests set what the TV reports and
 /// what fails, then check what the controller asked of it. The Tizen implementations it
 /// replaces live in launcher/tizen/Platform. Used through <see cref="HomeHarness"/>.
 /// </summary>
-sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics
+sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics, IInputPreview
 {
     /// <summary>Creates the TV with a brightness of 30 and the sleep timer off.</summary>
     public FakeTv()
@@ -23,7 +23,7 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     }
 
     /// <summary>The ports bundle over this TV.</summary>
-    public HomePorts Ports => new(this, this, this, this, this, this);
+    public HomePorts Ports => new(this, this, this, this, this, this, this);
 
     /// <summary>The connected inputs.</summary>
     public List<InputSource> Inputs { get; set; } = new();
@@ -73,11 +73,26 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     /// <summary>What <see cref="Launch"/> returns.</summary>
     public LaunchResult LaunchResult { get; set; } = new(true, 0);
 
+    /// <summary>The input whose preview is asked for, or null while none is.</summary>
+    public int? Previewing { get; private set; }
+
+    /// <summary>The slot of the card <see cref="Previewing"/> is shown in, or -1.</summary>
+    public int PreviewSlot { get; private set; } = -1;
+
+    /// <summary>When true, the TV refuses every preview and raises <see cref="Failed"/>.</summary>
+    public bool PreviewFails { get; set; }
+
+    /// <summary>Previews, hides, releases, mutes, input switches and launches in the order they reached the TV, for example "silence", "preview 14", "release", "switch 14", "launch".</summary>
+    public List<string> Events { get; } = new();
+
     /// <summary>The last diagnostics text.</summary>
     public string State { get; private set; } = "";
 
     /// <summary>Raised by <see cref="RaiseChanged"/>.</summary>
     public event Action? Changed;
+
+    /// <summary>Raised by <see cref="Show"/> when <see cref="PreviewFails"/> is set.</summary>
+    public event Action? Failed;
 
     /// <summary>Subscribed.</summary>
     public int WatchStatus => 0;
@@ -102,6 +117,7 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     public int Switch(int sourceType)
     {
         Switched.Add(sourceType);
+        Events.Add("switch " + sourceType);
         if (SwitchResult >= 0)
             CurrentSource = sourceType;
         return SwitchResult;
@@ -153,7 +169,40 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     public LaunchResult Launch(LaunchRequest request)
     {
         Launched.Add(request);
+        Events.Add("launch");
         return LaunchResult;
+    }
+
+    /// <summary>Records the preview, or refuses it and raises <see cref="Failed"/> when <see cref="PreviewFails"/> is set.</summary>
+    public void Show(int sourceType, int slot)
+    {
+        Events.Add("preview " + sourceType);
+        if (PreviewFails)
+        {
+            Failed?.Invoke();
+            return;
+        }
+        Previewing = sourceType;
+        PreviewSlot = slot;
+    }
+
+    /// <summary>Records that the preview was put away.</summary>
+    public void Hide()
+    {
+        Events.Add("hide");
+        Previewing = null;
+        PreviewSlot = -1;
+    }
+
+    /// <summary>Records that the input's sound was muted under the home screen.</summary>
+    public void Silence() => Events.Add("silence");
+
+    /// <summary>Records that Quiet Home gave the screen up, ending any preview, as "release" or "release+sound".</summary>
+    public void Release(bool sound)
+    {
+        Events.Add(sound ? "release+sound" : "release");
+        Previewing = null;
+        PreviewSlot = -1;
     }
 
     /// <summary>Keeps the diagnostics text.</summary>

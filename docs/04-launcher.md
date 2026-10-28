@@ -12,17 +12,19 @@ All UI text here is English. See [attribution](../NOTICE.md).
 ## Obtain matching private framework references
 
 Build against the TV's own compatible `Tizen.NUI.dll`,
-`Tizen.Applications.Common.dll`, `Tizen.System.dll` and `Tizen.dll`.
+`Tizen.Applications.Common.dll`, `Tizen.System.dll` and `Tizen.dll`, plus
+`Tizen.TV.NUI.dll` and `Tizen.TV.Broadcast.TVService.dll`, the TV service
+behind the input preview ([HDMI preview](12-hdmi-preview.md)).
 The shipped project files use `Private=false`, so those references are not
 copied into the app package.
 
 Find the paths on the target:
 
 ```sh
-tv exec --command 'find /usr/share/dotnet.tizen -name Tizen.NUI.dll -o -name Tizen.Applications.Common.dll -o -name Tizen.System.dll -o -name Tizen.dll'
+tv exec --command 'find /usr/share/dotnet.tizen -name Tizen.NUI.dll -o -name Tizen.Applications.Common.dll -o -name Tizen.System.dll -o -name Tizen.dll -o -name Tizen.TV.NUI.dll -o -name Tizen.TV.Broadcast.TVService.dll'
 ```
 
-Inspect the results. When all four runtime assemblies are in one directory
+Inspect the results. When all six runtime assemblies are in one directory
 (`/usr/share/dotnet.tizen/framework` by default), pull them in one root
 session:
 
@@ -30,9 +32,11 @@ session:
 tv framework-pull --from /usr/share/dotnet.tizen/framework
 ```
 
-It verifies each file's SHA-256 against the TV, writes nothing unless all
-four transfers verify, and refuses to replace a copy already in
-`.local/tv-framework/`. If the assemblies are spread over several
+It verifies each file's SHA-256 against the TV and writes nothing unless all
+transfers verify. It pulls only the assemblies missing from
+`.local/tv-framework/` and never replaces a copy already there, so a checkout
+that has the first four from an earlier build gets the two TV service ones. If
+the assemblies are spread over several
 directories, pull them individually with
 `tv pull REMOTE_PATH .local/tv-framework/NAME.dll`. Do not use a random
 desktop/mobile SDK version just because it has a file with the same name.
@@ -49,10 +53,7 @@ example `--profile profiles/qe65s95fauxru-1301.0.json`; the profile's
 Public app cards are plain placeholders showing the app's name;
 [optional publisher artwork](06-artwork.md) can be fetched before rebuilding.
 
-## Adapt inputs and `quiet_page=home|apps|settings` a page, and `quiet_focus=toolbar` puts the focus
-on the page's first toolbar button. Any launch without `quiet_demo`
-returns to the normal state. With the launcher installed, refresh all six
-images with:
+## Adapt inputs and apps
 
 The Home page builds one card per connected input from `get_source_list()` in
 Samsung's `libsource-api.so`, and switches with the returned `sourceType`.
@@ -69,6 +70,23 @@ On the QE65S95F (`T-RSMFDEUC-0090-1301.0`) the call returned a JSON array
 allocated with `malloc`: Live TV (`sourceType` 0), a PlayStation 5 (14) and an
 unnamed HDMI 3 (15), each with an icon from `com.samsung.tv.theme-resource`.
 A `QN55S90FAFXZA` returned Live TV and one HDMI device (16).
+
+The focused input card widens to 16:9 and the other cards narrow to make room;
+on the Home tab the card of the input on screen is wide and Down focuses it.
+That card shows the input's live picture: the TV's main video plane is moved
+into it through Samsung's private TV service. Only the input already on screen
+is previewed, because previewing another one switched the TV's source or
+pipeline and with it HDR and Game Mode on every focus move; Live TV keeps its
+icon. While Quiet Home is in front it mutes the input's sound, as Samsung's
+home does, and turns it back on when an input opens or Quiet Home goes to the
+background. Before an input or app opens the TV's full-screen picture is put
+back first. After another app the card stays black until the input is opened
+again. If the TV refuses the preview (for example without the internal
+platform privilege, or on a TV without those assemblies), the cards keep their
+icons until Quiet Home restarts and the diagnostics file says
+`preview=unsupported`. All of this was tested on the QE65S95F
+(`T-RSMFDEUC-0090-1301.0`) only. See
+[the HDMI preview findings](12-hdmi-preview.md).
 
 Upload and run Probe to inspect the current main-operation handler:
 
@@ -177,8 +195,10 @@ extra `quiet_demo=1` shows the public catalog (packaged as
 `apps.public.json`), three sample inputs, fixed settings values and a 9:41
 clock. Settings and the theme changed during a demo stay in memory and change
 nothing on the TV; each demo starts from the same values. `quiet_theme=light|dark` picks a theme without saving it, and
-`quiet_page=home|apps|settings` a page. Any launch without `quiet_demo`
-returns to the normal state. With the launcher installed, refresh all six
+`quiet_page=home|apps|settings` a page, and `quiet_focus=toolbar` puts the focus
+on the page's first toolbar button. Any launch without `quiet_demo`
+returns to the normal state. Demo mode never shows an input preview and leaves the
+sound alone. With the launcher installed, refresh all six
 images with:
 
 ```sh
@@ -369,8 +389,8 @@ layout does not change: one DLL and `res/quiet-home`.
     and one `PageModel` per page. `IHomeView` is the port the view
     implements.
   - `Platform/` holds the ports to the TV: `IInputSources`,
-    `IQuickSettings`, `IThemeStore`, `IClock`, `ISystemLauncher` and
-    `IDiagnostics`, passed together as `HomePorts`. `Platform/Demo/` holds
+    `IQuickSettings`, `IThemeStore`, `IClock`, `ISystemLauncher`,
+    `IDiagnostics` and `IInputPreview`, passed together as `HomePorts`. `Platform/Demo/` holds
     the in-memory versions that demo mode puts in front of them.
   - `Actions/HomeAction` lists what Select on a card can do.
     `Settings/SettingsTile` is the table of Settings tiles, and
@@ -382,7 +402,9 @@ layout does not change: one DLL and `res/quiet-home`.
     and forwards Tizen's events to the controller. `KeyNames` maps the TV's
     key names to remote keys.
   - `Platform/` implements the ports with the P/Invoke declarations in
-    `Interop/`.
+    `Interop/`. `TizenInputPreview` and `TvVideoPlane` implement the input
+    preview and the mute with the TV service assemblies; `PreviewHole` in
+    `Views/` cuts the see-through hole the picture shows in.
   - `Views/` draws a `HomeScreen` with NUI. `HomeView` draws the chrome,
     focus and notice, and one view per page draws that page's content.
     `Layout` holds the coordinates and sizes, and `ArtworkCache` keeps app
@@ -452,7 +474,7 @@ Each one runs on `Fakes/HomeHarness`, a real `HomeController` over two
 stand-ins:
 
 - `FakeTv` implements every port in memory and records what was switched,
-  written and launched;
+  written, launched and previewed;
 - `FakeView` records each render, notice and clock text.
 
 ```csharp
@@ -470,8 +492,9 @@ checked only on the TV: by the demo frames and with the remote.
 
 Quiet Home rewrites `/tmp/quiet-home-state.txt` after every event. The file
 holds the page and focus, the last activity and key, the inputs, the catalog
-and artwork counters and the quick-setting values. Its keys and their order
-are a contract for the recipes and tools that read it.
+and artwork counters, the quick-setting values and, last, `preview=` (`on`,
+`off` or `unsupported`). Its keys and their order are a contract for the
+recipes and tools that read it; new keys go at the end.
 
 `build_ms` measures how long the view takes to build a page's NUI objects. It
 does not measure input-to-photon latency or the complete rendering time. It
@@ -501,6 +524,10 @@ remote what the frames do not show:
 
 - every page;
 - switching inputs, with picture and sound;
+- the input preview: the card of the input on screen shows it without
+  sound, other cards change no picture mode, and opening the input or leaving
+  Quiet Home gives a full-screen picture with sound (the frames cannot show
+  it, since a screenshot sees only the window);
 - volume, brightness, Game Mode and the sleep timer;
 - the theme;
 - the Samsung settings tiles;

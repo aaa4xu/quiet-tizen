@@ -5,7 +5,8 @@ namespace QuietHome.TizenHost.Views;
 /// <summary>
 /// The views of one focusable element as drawn: the card itself and the parts the focus
 /// changes. The page views create one per card of the page model, in the same order;
-/// <see cref="HomeView"/> changes them when the focus moves (see <see cref="FocusStyle"/>).
+/// <see cref="HomeView"/> changes them when the focus moves (see <see cref="FocusStyle"/>),
+/// and <see cref="HomePageView.Place"/> moves the input cards when the focused one widens.
 /// </summary>
 sealed class SlotView
 {
@@ -19,8 +20,8 @@ sealed class SlotView
     /// <summary>The card; it scales and moves around its centre.</summary>
     public View Card { get; }
 
-    /// <summary>Where the card is when it is not focused.</summary>
-    public Box Box { get; }
+    /// <summary>Where the card is, before the focus growth; only input cards change it.</summary>
+    public Box Box { get; set; }
 
     /// <summary>The shadow under the card, brighter while focused; null when the card has none.</summary>
     public View? Shadow { get; init; }
@@ -30,4 +31,10 @@ sealed class SlotView
 
     /// <summary>The value line of a Settings tile, which changes without a rebuild; null for other cards.</summary>
     public TextLabel? Value { get; init; }
+
+    /// <summary>The name under an input card, which moves with it; null for other cards.</summary>
+    public TextLabel? Title { get; init; }
+
+    /// <summary>The line under an input card's name, which moves with it; null for other cards.</summary>
+    public TextLabel? Subtitle { get; init; }
 }

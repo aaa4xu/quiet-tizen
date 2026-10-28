@@ -27,6 +27,7 @@ public sealed class QuietHomeApplication : NUIApplication
     };
 
     TizenInputSources? inputs;
+    TizenInputPreview? preview;
     HomeController? controller;
     Tizen.NUI.Timer? clockTimer;
 
@@ -37,8 +38,9 @@ public sealed class QuietHomeApplication : NUIApplication
         // The container's res/quiet-home/ (on the QE65S95F /opt/usr/apps/<container>/res/quiet-home/).
         string root = System.IO.Path.Combine(DirectoryInfo.Resource, "quiet-home") + "/";
         inputs = new TizenInputSources();
-        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile());
         var view = new HomeView(root);
+        preview = new TizenInputPreview(view);
+        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile(), preview);
         var home = new HomeController(ports, view, new HomeConfig(root + "apps.json", root + "apps.public.json", demoInputs));
         controller = home;
         Window.Default.Title = "Quiet Home";
@@ -85,11 +87,12 @@ public sealed class QuietHomeApplication : NUIApplication
         controller?.AppControl(options);
     }
 
-    /// <summary>Ending: stops the controller and the TV's input callback.</summary>
+    /// <summary>Ending: stops the controller, the TV's input callback and the input preview.</summary>
     protected override void OnTerminate()
     {
         controller?.Terminate();
         inputs?.Dispose();
+        preview?.Dispose();
         base.OnTerminate();
     }
 

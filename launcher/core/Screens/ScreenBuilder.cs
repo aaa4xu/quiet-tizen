@@ -59,7 +59,12 @@ public static class ScreenBuilder
         {
             var source = state.Inputs[i];
             var text = InputCard.For(source);
-            inputs.Add(new InputCardModel(i, text.Name, text.Description, source.IconPath, source.SourceType) { Focused = IsFocused(state, i) });
+            bool expanded = state.Selected == i && (state.Zone == Zone.FirstRow || state.Zone == Zone.Tabs);
+            inputs.Add(new InputCardModel(i, text.Name, text.Description, source.IconPath, source.SourceType)
+            {
+                Focused = IsFocused(state, i),
+                Expanded = expanded,
+            });
         }
         var apps = AppCatalog.DockApps(state.Library.ToList());
         var dock = new List<DockCardModel>();

@@ -36,10 +36,14 @@ readonly record struct FocusStyle(float Grow, int Border)
     /// <summary>Returns the scale of a focused card <paramref name="height"/> pixels tall.</summary>
     public float Scale(int height) => 1 + Grow / height;
 
+    /// <summary>Returns the size of the ring around a card of <paramref name="w"/> × <paramref name="h"/>.</summary>
+    public static Size RingSize(int w, int h) => new(w + 2 * (RingGap + RingWidth), h + 2 * (RingGap + RingWidth));
+
     /// <summary>
     /// Adds a hidden focus ring in <paramref name="color"/> around <paramref name="card"/> of
     /// <paramref name="w"/> × <paramref name="h"/> with corner radius <paramref name="radius"/>,
-    /// and returns it. The ring is a child of the card, so it grows with it.
+    /// and returns it. The ring is a child of the card, so it grows with it; a card that
+    /// changes size gives its ring <see cref="RingSize"/>.
     /// </summary>
     public static View AddRing(View card, int w, int h, int radius, Color color)
     {
@@ -48,7 +52,7 @@ readonly record struct FocusStyle(float Grow, int Border)
         var ring = new View
         {
             Position2D = new Position2D(-outset, -outset),
-            Size2D = new Size2D(w + 2 * outset, h + 2 * outset),
+            Size = RingSize(w, h),
             BackgroundColor = ViewPalette.Clear(),
             CornerRadius = new Vector4(corner, corner, corner, corner),
             BorderlineWidth = RingWidth,

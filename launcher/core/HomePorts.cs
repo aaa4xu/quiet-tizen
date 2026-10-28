@@ -13,10 +13,12 @@ namespace QuietHome.Core;
 /// <param name="Clock">The TV's clock.</param>
 /// <param name="Launcher">Opens other apps.</param>
 /// <param name="Diagnostics">The diagnostics file.</param>
+/// <param name="Preview">The live picture of an input inside its card.</param>
 public sealed record HomePorts(
     IInputSources Inputs,
     IQuickSettings QuickSettings,
     IThemeStore ThemeStore,
     IClock Clock,
     ISystemLauncher Launcher,
-    IDiagnostics Diagnostics);
+    IDiagnostics Diagnostics,
+    IInputPreview Preview);

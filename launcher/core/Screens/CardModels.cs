@@ -28,7 +28,14 @@ public abstract record CardModel(int Row, string Name, string? Description, Home
 /// <param name="IconPath">The TV's icon for the input, or null or blank for none.</param>
 /// <param name="SourceType">The TV's number for the input.</param>
 public sealed record InputCardModel(int Index, string Name, string Text, string? IconPath, int SourceType)
-    : CardModel(0, Name, Text, new HomeAction.SwitchInput(SourceType));
+    : CardModel(0, Name, Text, new HomeAction.SwitchInput(SourceType))
+{
+    /// <summary>
+    /// True when the card is shown wide (16:9): while it has the focus, and while the focus
+    /// is on the Home tab and this is the card Down would focus.
+    /// </summary>
+    public bool Expanded { get; init; }
+}
 
 /// <summary>
 /// A card in the dock at the bottom of the Home page: one of the catalog's first apps, or

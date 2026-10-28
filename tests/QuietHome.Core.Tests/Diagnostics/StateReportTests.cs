@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using QuietHome.Core.Diagnostics;
 using QuietHome.Core.Navigation;
+using QuietHome.Core.Platform;
 using Xunit;
 
 namespace QuietHome.Core.Tests.Diagnostics;
@@ -24,11 +25,11 @@ public class StateReportTests
             "page", "selected", "area", "activity", "key", "font_loaded", "style", "theme", "theme_error", "demo",
             "build_ms", "library_page", "library_count", "library_error", "inputs", "input_error", "source_callback",
             "selected_name", "artwork_cached", "artwork_ready", "artwork_pending", "artwork_views_created",
-            "page_artwork_cold", "process_id", "editing", "volume", "brightness", "game-mode", "sleeptimer",
+            "page_artwork_cold", "process_id", "editing", "volume", "brightness", "game-mode", "sleeptimer", "preview",
         }, lines[1..^1].Select(l => l.Split('=')[0]));
     }
 
-    /// <summary>Pages and zones are written as numbers, booleans as True / False, the theme and adjustment by name.</summary>
+    /// <summary>Pages and zones are written as numbers, booleans as True / False, the theme, adjustment and preview by name.</summary>
     [Fact]
     public void ValueFormats()
     {
@@ -43,6 +44,7 @@ public class StateReportTests
             Editing = Adjustment.Brightness,
             Volume = -1,
             GameMode = "2",
+            Preview = PreviewState.Unsupported,
         };
         string text = report.Format(DateTime.UnixEpoch);
         Assert.Contains("\npage=2\n", text);
@@ -55,5 +57,6 @@ public class StateReportTests
         Assert.Contains("\nediting=brightness\n", text);
         Assert.Contains("\nvolume=-1\n", text);
         Assert.Contains("\ngame-mode=2\n", text);
+        Assert.Contains("\npreview=unsupported\n", text);
     }
 }

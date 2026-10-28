@@ -7,7 +7,7 @@ namespace QuietHome.Core.Diagnostics;
 /// The content of the diagnostics file <c>/tmp/quiet-home-state.txt</c>: one
 /// <c>key=value</c> line per value after a timestamp. Tools on the computer read it over SDB
 /// (tools/screens.py, tools/screen_compare.py, recipes), so the keys and their order must not
-/// change. <see cref="HomeController"/> fills one after every change and writes <see cref="Format"/> through
+/// change; new keys go at the end. <see cref="HomeController"/> fills one after every change and writes <see cref="Format"/> through
 /// <see cref="Platform.IDiagnostics"/>.
 /// </summary>
 public sealed class StateReport
@@ -96,6 +96,9 @@ public sealed class StateReport
     /// <summary>Line <c>sleeptimer=</c>: the raw sleep timer value, or "".</summary>
     public string SleepTimer { get; set; } = "";
 
+    /// <summary>Line <c>preview=</c>: the input preview, see <see cref="Platform.PreviewStateNames.Name"/>. Added last so older readers keep working.</summary>
+    public Platform.PreviewState Preview { get; set; }
+
     /// <summary>
     /// Returns the file's text: <paramref name="utcNow"/> in round-trip format, then every
     /// line in the fixed order, each ending with a newline. Booleans read "True" / "False".
@@ -131,5 +134,6 @@ public sealed class StateReport
         + "\nbrightness=" + Brightness
         + "\ngame-mode=" + GameMode
         + "\nsleeptimer=" + SleepTimer
+        + "\npreview=" + Platform.PreviewStateNames.Name(Preview)
         + "\n";
 }

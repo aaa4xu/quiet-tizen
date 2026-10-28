@@ -106,8 +106,30 @@ static class Layout
     /// <summary>Font sizes of the input name and the line under it.</summary>
     public const float InputNameSize = 31, InputTextSize = 24;
 
-    /// <summary>Returns the width of each of <paramref name="count"/> input cards.</summary>
+    /// <summary>Width of the focused input card: 16:9 at <see cref="InputHeight"/>, the shape of the input's picture.</summary>
+    public const int InputWideWidth = 786;
+
+    /// <summary>Returns the width of each of <paramref name="count"/> input cards while none has the focus.</summary>
     public static int InputWidth(int count) => Math.Min(InputMaxWidth, (InputRowWidth - InputGap * (count - 1)) / count);
+
+    /// <summary>
+    /// Returns where input card <paramref name="index"/> of <paramref name="count"/> goes.
+    /// The card at <paramref name="focused"/> is <see cref="InputWideWidth"/> wide and the
+    /// others share the rest of the row; with <paramref name="focused"/> -1 all are equal.
+    /// </summary>
+    public static Box InputBox(int index, int count, int focused)
+    {
+        if (focused < 0)
+        {
+            int w = InputWidth(count);
+            return new Box(Margin + index * (w + InputGap), InputY, w, InputHeight);
+        }
+        int narrow = count > 1 ? Math.Min(InputMaxWidth, (InputRowWidth - InputGap * (count - 1) - InputWideWidth) / (count - 1)) : 0;
+        int x = Margin;
+        for (int i = 0; i < index; i++)
+            x += (i == focused ? InputWideWidth : narrow) + InputGap;
+        return new Box(x, InputY, index == focused ? InputWideWidth : narrow, InputHeight);
+    }
 
     /// <summary>The glass shelf under the dock.</summary>
     public static readonly Box Shelf = new(0, 784, 1920, 280);
