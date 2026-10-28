@@ -70,10 +70,12 @@ session; allow its cleanup checks to complete first.
 
 ## C# code
 
-New or substantially rewritten C# (`launcher/core`, `tests/QuietHome.Core.Tests`,
-`launcher/tizen/Interop`, `launcher/tizen/Platform` and whatever else is taken
-out of `launcher/tizen/Home.cs`) must be clear to a
-reader who sees only that file, including an agent on a much simpler model.
+Quiet Home's C# (`launcher/core`, `tests/QuietHome.Core.Tests` and
+`launcher/tizen` apart from `QuickLaunch.cs`) must be clear to a reader who
+sees only that file, including an agent on a much simpler model. The core holds
+the behaviour (`HomeController`, page models, ports); `launcher/tizen` only
+wires the app, implements the ports (`Platform`, `Interop`) and draws with NUI
+(`Views`).
 
 - Every class, struct, interface and enum has a `///` comment on its place in
   the app's architecture: its layer (core logic, platform port, Tizen
@@ -83,8 +85,8 @@ reader who sees only that file, including an agent on a much simpler model.
 - The build enforces this only for public members of the core and test
   projects (CS1591 is an error there); check the rest in review.
 
-The dense existing code in `Home.cs`, `QuickLaunch.cs` and `Probe.cs` is
-exempt until it is rewritten.
+The dense code in `QuickLaunch.cs` and `Probe.cs` is exempt: rewriting it
+would change assemblies that must stay byte-identical.
 
 ## Local data and publication
 

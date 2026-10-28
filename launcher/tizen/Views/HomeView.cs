@@ -1,0 +1,220 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using QuietHome.Core.Catalog;
+using QuietHome.Core.Screens;
+using Tizen.NUI;
+using Tizen.NUI.BaseComponents;
+
+namespace QuietHome.TizenHost.Views;
+
+/// <summary>
+/// The NUI implementation of the core's <see cref="IHomeView"/>: draws a
+/// <see cref="HomeScreen"/> on the app's window. It draws the chrome (background, title,
+/// tabs, clock, toolbar, bottom lines) itself and hands the page content to
+/// <see cref="HomePageView"/>, <see cref="AppsPageView"/> or <see cref="SettingsPageView"/>.
+/// The Quiet Home app creates one at start and passes it to the core's HomeController.
+/// </summary>
+sealed class HomeView : IHomeView
+{
+    const int FocusAnimationMs = 180;
+
+    readonly string root;
+    readonly bool fontLoaded;
+    readonly Scene scene = new();
+    readonly ArtworkCache artwork;
+    readonly List<SlotView> slots = new();
+    ViewPalette palette = new(true);
+    Animation? focusAnimation;
+    TextLabel[] tabs = Array.Empty<TextLabel>();
+    TextLabel? clock, toolbarHint, detail, notice;
+    long buildMilliseconds;
+    int pageArtworkCold;
+
+    /// <summary>
+    /// Creates the view for artwork files under <paramref name="root"/> (ending in "/") and
+    /// registers the bundled fonts from its "fonts" folder.
+    /// </summary>
+    public HomeView(string root)
+    {
+        this.root = root;
+        try
+        {
+            fontLoaded = FontClient.Instance.AddCustomFontDirectory(root + "fonts");
+        }
+        catch (Exception)
+        {
+            fontLoaded = false;
+        }
+        artwork = new ArtworkCache(root);
+        artwork.Loaded += () => ArtworkLoaded?.Invoke();
+    }
+
+    /// <summary>Raised when an artwork image finished loading or failed.</summary>
+    public event Action? ArtworkLoaded;
+
+    /// <summary>Fonts, the last build time and the artwork counts.</summary>
+    public ViewStats Stats => new(fontLoaded, buildMilliseconds, artwork.Count, artwork.Ready, artwork.Pending, artwork.Created, pageArtworkCold);
+
+    /// <summary>Starts loading the catalog's artwork in the sizes the pages use.</summary>
+    public void Preload(IReadOnlyList<LibraryApp> library) => artwork.Preload(library);
+
+    /// <summary>Draws the page from scratch, or updates focus and values of the page on screen.</summary>
+    public void Render(HomeScreen screen, RenderMode mode)
+    {
+        if (mode == RenderMode.Rebuild)
+            Rebuild(screen);
+        else
+            ApplyFocus(screen, mode == RenderMode.AnimateFocus);
+    }
+
+    /// <summary>Sets the notice text; a rebuilt page starts without one.</summary>
+    public void ShowNotice(string text)
+    {
+        if (notice != null)
+            notice.Text = text;
+    }
+
+    /// <summary>Sets the clock text.</summary>
+    public void ShowClock(string text)
+    {
+        if (clock != null)
+            clock.Text = text;
+    }
+
+    /// <summary>
+    /// Destroys the page on screen and draws <paramref name="screen"/> in the fixed order the
+    /// screenshots depend on: background, title, tabs, clock, page content, toolbar, bottom
+    /// lines; then applies the focus without animation. Measures the time for <c>build_ms</c>.
+    /// </summary>
+    void Rebuild(HomeScreen screen)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        StopAnimation();
+        artwork.Park();
+        scene.Clear();
+        slots.Clear();
+        palette = new ViewPalette(screen.Dark);
+        Window.Default.BackgroundColor = palette.Window;
+        var chrome = screen.Chrome;
+        scene.Add(new ImageView { ResourceUrl = root + palette.Themed("free-background.svg"), Size2D = new Size2D(Layout.ScreenWidth, Layout.ScreenHeight) });
+        scene.Text(chrome.Title, Layout.Title, Layout.TitleSize, palette.Ink, "Display");
+        tabs = new TextLabel[ChromeModel.TabNames.Count];
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            tabs[i] = scene.Text(ChromeModel.TabNames[i], new Box(Layout.TabX[i], Layout.TabY, Layout.TabWidth[i], Layout.TabHeight), Layout.TabSize, palette.Muted);
+            tabs[i].HorizontalAlignment = HorizontalAlignment.Center;
+        }
+        clock = scene.TextEnd(chrome.Clock, Layout.Clock, Layout.ClockSize, palette.Muted);
+        var canvas = new PageCanvas(scene, palette, root, artwork, slots);
+        switch (screen.Content)
+        {
+            case HomePageModel home:
+                HomePageView.Build(canvas, home);
+                break;
+            case AppsPageModel apps:
+                AppsPageView.Build(canvas, apps);
+                break;
+            case SettingsPageModel settings:
+                SettingsPageView.Build(canvas, settings);
+                break;
+        }
+        pageArtworkCold = canvas.ColdArtwork;
+        foreach (var button in chrome.Toolbar)
+            BuildToolbarButton(button);
+        toolbarHint = scene.TextEnd("", Layout.ToolbarHint, Layout.ClockSize, palette.Ink);
+        detail = scene.Text("", Layout.Detail, Layout.BottomSize, palette.Muted);
+        notice = scene.Text("", Layout.Notice, Layout.NoticeSize, palette.Accent);
+        scene.TextEnd(chrome.Hint, Layout.Hint, Layout.BottomSize, palette.Muted);
+        ApplyFocus(screen, false);
+        buildMilliseconds = stopwatch.ElapsedMilliseconds;
+        artwork.Recount();
+    }
+
+    /// <summary>Adds one round toolbar button with its glass background and icon.</summary>
+    void BuildToolbarButton(ToolbarButtonModel button)
+    {
+        int x = Layout.ToolbarX(button.Position), size = Layout.ToolbarSize;
+        var card = scene.Card(x + size / 2, Layout.ToolbarY + size / 2, size, size, ViewPalette.Clear(), 34);
+        card.Add(new ImageView { ResourceUrl = root + palette.Themed("glass-button.svg"), Position2D = new Position2D(-16, -16), Size2D = new Size2D(100, 112) });
+        card.Add(new ImageView { ResourceUrl = root + "symbol-" + button.Icon + ".png", Color = palette.Ink, Position2D = new Position2D(19, 19), Size2D = new Size2D(30, 30) });
+        slots.Add(new SlotView(card, new Box(x, Layout.ToolbarY, size, size)));
+    }
+
+    /// <summary>
+    /// Shows which element has the focus: the current tab, each card's size, border, lift,
+    /// shadow, ring and name weight (see <see cref="FocusStyle"/>), the focused card on top,
+    /// and the clock, toolbar hint, detail line and Settings values. With
+    /// <paramref name="animate"/> cards move there in a short animation.
+    /// </summary>
+    void ApplyFocus(HomeScreen screen, bool animate)
+    {
+        StopAnimation();
+        if (animate)
+            focusAnimation = new Animation(FocusAnimationMs);
+        var chrome = screen.Chrome;
+        for (int i = 0; i < tabs.Length; i++)
+        {
+            bool current = i == (int)chrome.Page;
+            tabs[i].TextColor = current ? palette.Ink : palette.Muted;
+            tabs[i].FontFamily = Scene.Font(current ? "Semibold" : "Medium");
+            tabs[i].BackgroundColor = chrome.TabsFocused && current ? palette.TabFocus : ViewPalette.Clear();
+            tabs[i].CornerRadius = new Vector4(Layout.TabRadius, Layout.TabRadius, Layout.TabRadius, Layout.TabRadius);
+        }
+        var cards = screen.Cards;
+        for (int i = 0; i < slots.Count && i < cards.Count; i++)
+            ApplyCardFocus(slots[i], cards[i], focusAnimation);
+        focusAnimation?.Play();
+        if (clock != null)
+            clock.Opacity = chrome.ClockVisible ? 1 : 0;
+        if (toolbarHint != null)
+            toolbarHint.Text = chrome.ToolbarHint;
+        if (detail != null)
+            detail.Text = chrome.Detail;
+        for (int i = 0; i < slots.Count && i < cards.Count; i++)
+        {
+            if (cards[i] is SettingsTileModel tile && slots[i].Label is TextLabel value)
+                value.Text = tile.Value;
+        }
+    }
+
+    /// <summary>Gives one card its focused or normal look, through <paramref name="animation"/> when there is one.</summary>
+    void ApplyCardFocus(SlotView slot, CardModel card, Animation? animation)
+    {
+        bool focused = card.Focused;
+        var style = FocusStyle.For(card);
+        float scale = focused ? style.Scale : 1;
+        slot.Card.BorderlineWidth = focused ? style.FocusedBorder : style.Border;
+        slot.Card.BorderlineColor = style.AccentBorder && focused ? palette.Accent : ViewPalette.CardBorder(focused);
+        var box = slot.Box;
+        var position = new Position(box.X + box.W / 2f, box.Y + box.H / 2f - (focused ? style.Lift : 0), 0);
+        if (animation != null)
+        {
+            animation.AnimateTo(slot.Card, "Scale", new Vector3(scale, scale, 1));
+            animation.AnimateTo(slot.Card, "Position", position);
+        }
+        else
+        {
+            slot.Card.Scale = new Vector3(scale, scale, 1);
+            slot.Card.Position = position;
+        }
+        if (slot.Shadow != null)
+            slot.Shadow.Opacity = focused ? 1 : .55f;
+        if (slot.FocusRing != null)
+            slot.FocusRing.Opacity = focused ? 1 : 0;
+        if (slot.Label != null && style.BoldName)
+            slot.Label.FontFamily = Scene.Font(focused ? "Semibold" : "Medium");
+        if (focused)
+            slot.Card.RaiseToTop();
+    }
+
+    /// <summary>Stops and frees a focus animation still running.</summary>
+    void StopAnimation()
+    {
+        if (focusAnimation == null)
+            return;
+        focusAnimation.Stop();
+        focusAnimation.Dispose();
+        focusAnimation = null;
+    }
+}

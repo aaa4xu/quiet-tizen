@@ -6,7 +6,7 @@ namespace QuietHome.Core.Tests.Theme;
 /// <summary>
 /// Tests of the theme colors: reading catalog colors (<see cref="Rgba.FromHex"/>), the two
 /// palettes and the placeholder card math in <see cref="ColorMath"/>. The expected numbers
-/// were computed with the color code of launcher/tizen/Home.cs before it moved to the core,
+/// were computed with the color code of the former launcher/tizen/Home.cs before it moved to the core,
 /// so a passing test means the cards look exactly as before.
 /// </summary>
 public class ColorTests

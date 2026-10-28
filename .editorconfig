@@ -1,7 +1,7 @@
 root = true
 
-# C# in launcher/core and tests/. launcher/tizen/Home.cs keeps its dense style until it is
-# taken apart; QuickLaunch.cs and Probe.cs stay as they are so their assemblies do not change.
+# C# in launcher/core, launcher/tizen and tests/. QuickLaunch.cs and Probe.cs keep their
+# dense style so their assemblies do not change.
 [*.cs]
 charset = utf-8
 end_of_line = lf

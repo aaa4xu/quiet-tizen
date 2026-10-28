@@ -54,7 +54,7 @@ cleanup compatibility.
 
 | Component | What it does |
 |---|---|
-| [Quiet Home source](launcher/tizen/Home.cs) | Native .NET/NUI home, HDMI cards, app library and quick settings |
+| Quiet Home source: [logic](launcher/core), [TV host and views](launcher/tizen) | Native .NET/NUI home, HDMI cards, app library and quick settings |
 | [App catalog](launcher/assets/apps.json) | Example shortcuts for Netflix, YouTube, Prime Video, HBO Max, Disney+, Hulu, Spotify, Apple TV, Tubi, Luna and Xbox |
 | [Artwork tools](docs/06-artwork.md) | Vector/high-resolution artwork sources, optional local downloads and retained image views |
 | [Cleanup profile](profiles/un75u8000ffxza-1300.9.json) | Separately selectable advertising, voice, context, smart-extras, sidebar and TV Plus groups |

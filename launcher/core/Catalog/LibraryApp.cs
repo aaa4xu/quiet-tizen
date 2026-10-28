@@ -4,8 +4,9 @@ namespace QuietHome.Core.Catalog;
 /// One entry of the app catalog, <c>launcher/assets/apps.json</c> (or the owner's
 /// <c>apps.local.json</c>). Each entry is a card on the Apps page; the first five that are
 /// not <see cref="Utility"/> also form the dock on the Home page. This is plain data:
-/// <see cref="AppCatalog.Load"/> creates and checks the entries, and the TV host
-/// (<c>launcher/tizen/Home.cs</c>) draws them and launches <see cref="Id"/> on Select.
+/// <see cref="AppCatalog.Load"/> creates and checks the entries, the TV views
+/// (<c>launcher/tizen/Views</c>) draw them and <see cref="HomeController"/> launches
+/// <see cref="Id"/> on Select.
 /// </summary>
 public sealed class LibraryApp
 {

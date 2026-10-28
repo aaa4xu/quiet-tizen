@@ -152,9 +152,10 @@ Verify visibly:
 - Chosen app shortcuts launch the correct installed apps.
 - The Controllers shortcut reaches the Bluetooth device list.
 
-The `build_ms` value in `/tmp/quiet-home-state.txt` measures scene construction,
-not input-to-photon latency or complete rendering time. It does not include
-reading the TV's input list: the list is read once per event (start, resume,
+The `build_ms` value in `/tmp/quiet-home-state.txt` measures how long the view
+takes to build a page's NUI objects, not input-to-photon latency or complete
+rendering time. It does not include reading the TV's settings or input list:
+the settings are read before the page is built, and the input list is read once per event (start, resume,
 window focus, the TV's change callback, a Home request and arriving at the
 Home page) and kept, and the Home page is built from the kept list. Values
 from builds before this change also counted `get_source_list()` and are not
