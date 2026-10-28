@@ -4,7 +4,7 @@
     <UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../launcher/src/AppLibrary.cs" />
+    <Compile Include="../launcher/core/Catalog/AppLibrary.cs" />
     <Compile Include="CatalogTests.cs" />
   </ItemGroup>
 </Project>

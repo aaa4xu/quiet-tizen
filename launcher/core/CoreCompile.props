@@ -1,0 +1,10 @@
+<Project>
+  <!-- Code that is compiled into the TV assembly: the TV runs .NET 6 and gets no NuGet packages.
+       QuietHome.Core.csproj and ../tizen/Home.csproj import this; QuickLaunch and Probe do not. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+</Project>

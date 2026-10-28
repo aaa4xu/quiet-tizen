@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup>
-  <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><AssemblyName>BixbyPromotion</AssemblyName>
-  <UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems><DebugType>none</DebugType><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable>
+  <OutputType>Exe</OutputType><AssemblyName>BixbyPromotion</AssemblyName>
+  <UseAppHost>false</UseAppHost><EnableDefaultCompileItems>false</EnableDefaultCompileItems><DebugType>none</DebugType>
  </PropertyGroup>
- <ItemGroup><Compile Include="Home.cs" /><Compile Include="AppLibrary.cs" /></ItemGroup>
+ <Import Project="../core/CoreCompile.props" />
+ <!-- The core's sources go into this one assembly; its own build output must not. -->
+ <ItemGroup><Compile Include="Home.cs" /><Compile Include="../core/**/*.cs" Exclude="../core/obj/**;../core/bin/**" /></ItemGroup>
  <Import Project="QuietHomeContainer.targets" />
  <ItemGroup>
   <Reference Include="Tizen.NUI"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.NUI.dll</HintPath><Private>false</Private></Reference>

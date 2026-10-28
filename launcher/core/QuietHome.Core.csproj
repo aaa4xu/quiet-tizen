@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Quiet Home logic without Tizen references. The TV build compiles these sources into its
+       single entry assembly (../tizen/Home.csproj); this project exists for tests on a computer. -->
+  <Import Project="CoreCompile.props" />
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+</Project>

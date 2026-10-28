@@ -29,9 +29,9 @@ def main():
         launcher = json.loads(args.profile.read_text(encoding="utf-8"))["launcher"]
         home_dll = launcher["dll"]
         common = [f"-p:TV_FRAMEWORK_DIR={args.framework.resolve()}", f"-p:QuietHomeAppId={launcher['app_id']}"]
-        jobs.append((ROOT / "launcher/src/Home.csproj", "Home", "Home",
+        jobs.append((ROOT / "launcher/tizen/Home.csproj", "Home", "Home",
                      [*common, f"-p:AssemblyName={Path(home_dll).stem}"]))
-        jobs.append((ROOT / "launcher/src/QuickLaunch.csproj", "QuickLaunch", "QuickLaunch", common))
+        jobs.append((ROOT / "launcher/tizen/QuickLaunch.csproj", "QuickLaunch", "QuickLaunch", common))
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
     for project, output, intermediate, extra in jobs:
         subprocess.run([
