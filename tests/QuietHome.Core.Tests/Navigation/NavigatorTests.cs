@@ -154,6 +154,36 @@ public class NavigatorTests
         Assert.Equal((Zone.SecondRow, 0), (navigator.Zone, navigator.Selected));
     }
 
+    /// <summary>
+    /// Apps with an empty catalog: there is no card to focus, so focus goes to the tabs after
+    /// drawing, and Left or Right in the empty grid returns to the tabs instead of failing.
+    /// </summary>
+    [Fact]
+    public void EmptyCatalogSendsFocusToTheTabs()
+    {
+        var rows = AppsPage(0);
+        var navigator = At(Page.Apps, Zone.FirstRow);
+        navigator.SettleAfterBuild(rows);
+        Assert.Equal(Zone.Tabs, navigator.Zone);
+        navigator.Zone = Zone.FirstRow;
+        Assert.Equal(KeyOutcome.Refocus, navigator.HandleKey(RemoteKey.Right, rows, 0));
+        Assert.Equal(Zone.Tabs, navigator.Zone);
+        Assert.Equal(KeyOutcome.Refocus, navigator.HandleKey(RemoteKey.Select, rows, 0));
+        Assert.Equal(Zone.Tabs, navigator.Zone);
+    }
+
+    /// <summary>Home without inputs: Select on the tabs enters the dock, not the empty row of inputs.</summary>
+    [Fact]
+    public void SelectSkipsAnEmptyRow()
+    {
+        var rows = HomePage(inputs: 0);
+        var navigator = At(Page.Home, Zone.Tabs);
+        navigator.HandleKey(RemoteKey.Select, rows, 0);
+        Assert.Equal((Zone.SecondRow, 0), (navigator.Zone, navigator.Selected));
+        navigator.HandleKey(RemoteKey.Left, rows, 0);
+        Assert.Equal(5, navigator.Selected);
+    }
+
     /// <summary>After drawing, a focus position past the last slot is pulled back to the last slot.</summary>
     [Fact]
     public void SettleKeepsFocusOnThePage()

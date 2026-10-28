@@ -64,6 +64,7 @@ public sealed class Navigator
                 // Select on a tab enters the page.
                 Zone = Zone.FirstRow;
                 Selected = 0;
+                LeaveEmptyRow(rows);
                 return KeyOutcome.Refocus;
             case RemoteKey.Back:
             case RemoteKey.Exit:
@@ -75,16 +76,32 @@ public sealed class Navigator
 
     /// <summary>
     /// Fixes the focus after the host has drawn a page: keeps <see cref="Selected"/> within
-    /// the page's slots, and on a Home page without inputs moves focus from the empty first
-    /// row to the first dock card.
+    /// the page's slots and moves focus off a row that has no cards (see <see cref="LeaveEmptyRow"/>).
     /// </summary>
     public void SettleAfterBuild(SlotRows rows)
     {
         Selected = System.Math.Max(0, System.Math.Min(Selected, rows.Count - 1));
-        if (Page == Page.Home && Zone == Zone.FirstRow && rows.Row(0).Count == 0)
+        LeaveEmptyRow(rows);
+    }
+
+    /// <summary>
+    /// Moves focus off a row of cards that has no cards: on a Home page without inputs to the
+    /// first dock card, elsewhere (the Apps page of an empty catalog) to the tabs. Does nothing
+    /// when the focused row has cards or focus is not on a row of cards.
+    /// </summary>
+    void LeaveEmptyRow(SlotRows rows)
+    {
+        if ((Zone != Zone.FirstRow && Zone != Zone.SecondRow) || rows.Row((int)Zone - 1).Count > 0)
+            return;
+        var dock = rows.Row(1);
+        if (Page == Page.Home && Zone == Zone.FirstRow && dock.Count > 0)
         {
             Zone = Zone.SecondRow;
-            Selected = rows.Row(1)[0];
+            Selected = dock[0];
+        }
+        else
+        {
+            Zone = Zone.Tabs;
         }
     }
 
@@ -211,7 +228,8 @@ public sealed class Navigator
     /// Moves focus left (<paramref name="step"/> = -1) or right (+1). On the tabs it changes
     /// the page; past the first or last tab it goes to the toolbar. On the toolbar it moves
     /// between buttons and past either end goes back to the tabs (the last or first page).
-    /// In a row of cards it moves to the neighbour, wrapping around at the ends.
+    /// In a row of cards it moves to the neighbour, wrapping around at the ends; in an empty
+    /// row it leaves the row (see <see cref="LeaveEmptyRow"/>).
     /// </summary>
     KeyOutcome MoveSideways(SlotRows rows, int step)
     {
@@ -244,6 +262,11 @@ public sealed class Navigator
             return KeyOutcome.Refocus;
         }
         var row = rows.Row((int)Zone - 1);
+        if (row.Count == 0)
+        {
+            LeaveEmptyRow(rows);
+            return KeyOutcome.Refocus;
+        }
         int index = row.IndexOf(Selected);
         Selected = row[(index + step + row.Count) % row.Count];
         return KeyOutcome.Refocus;
