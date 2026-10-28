@@ -1,6 +1,9 @@
+import hashlib
+import os
 import re
 import sqlite3
 import subprocess
+import tarfile
 import tempfile
 from pathlib import Path
 import unittest
@@ -149,6 +152,84 @@ class RecordedContainerTests(unittest.TestCase):
         self.assertEqual(self.header("restore-launcher.sh", ids, recorded=f"{CONTAINER} Host.dll"),
                          f"{CONTAINER} Host.dll")
         self.assertIsNone(self.header("restore-launcher.sh", [*ids, "other.host", "Host.dll"]))
+
+
+class UpdateTests(unittest.TestCase):
+    """update-launcher.sh on a synthetic container, with Samsung's tools stubbed out."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name)
+        self.backup = root / "backups/home-01"
+        self.app = root / f"apps/{CONTAINER}"
+        self.stage = root / "stage"
+        stubs = root / "stubs"
+        for directory in (self.backup, self.app / "bin", self.app / "res/quiet-home", self.stage, stubs):
+            directory.mkdir(parents=True)
+        for tool in ("app_launcher", "chown", "chsmack"):
+            (stubs / tool).write_text("#!/bin/sh\nexit 0\n")
+            (stubs / tool).chmod(0o755)
+        (self.backup / "launcher-container.txt").write_text(f"{CONTAINER} Host.dll\n")
+        (self.backup / "original-metadata.txt").write_text("644 201:0 10\n")
+        self.dll = self.app / "bin/Host.dll"
+        self.dll.write_text("build-1")
+        (self.app / "res/quiet-home/apps.json").write_text("catalog-1")
+        script = (ROOT / "recipes/update-launcher.sh").read_text(encoding="utf-8")
+        script = script.replace('test "$(id -u)" = 0\n', "")
+        for path, local in (("/opt/usr/share/quiet-tizen-backups", root / "backups"),
+                            ("/opt/usr/apps", root / "apps"), ("/home/owner/share/tmp/sdk_tools/quiet-tizen", self.stage)):
+            script = script.replace(path, str(local))
+        self.script = script
+        self.environment = {"PATH": f"{stubs}:{os.environ['PATH']}:/sbin"}
+        digest = hashlib.sha256(b"build-1").hexdigest()  # what install-launcher.sh recorded
+        (self.backup / "installed-home.sha256").write_text(f"{digest}  {self.dll}\n")
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def run_recipe(self, *args):
+        self.last = subprocess.run(["sh", "-c", self.script, "sh", *args], capture_output=True, text=True,
+                                   env=self.environment)
+        return self.last.returncode == 0
+
+    def stage_build(self, build):
+        source = Path(self.temp.name) / build
+        (source / "quiet-home").mkdir(parents=True)
+        (source / "Host.dll").write_text(build)
+        (source / "quiet-home/apps.json").write_text(f"catalog-{build}")
+        with tarfile.open(self.stage / "package.tar.gz", "w:gz") as package:
+            package.add(source, arcname=".")
+
+    def installed(self):
+        return self.dll.read_text(), (self.app / "res/quiet-home/apps.json").read_text()
+
+    @runs_on_tv
+    def test_updates_roll_back_newest_first_to_the_installed_build(self):
+        self.stage_build("build-2")
+        self.assertTrue(self.run_recipe("apply", "home-01", "u2"), self.last.stderr)
+        self.assertEqual(self.installed(), ("build-2", "catalog-build-2"))
+        self.assertFalse(self.run_recipe("apply", "home-01", "u2"))  # each update name is used once
+        self.stage_build("build-3")
+        self.assertTrue(self.run_recipe("apply", "home-01", "u3"), self.last.stderr)
+        self.assertFalse(self.run_recipe("rollback", "home-01", "u2"))  # u3 sits on top of it
+        self.assertEqual(self.installed(), ("build-3", "catalog-build-3"))
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u3"), self.last.stderr)
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u2"), self.last.stderr)
+        self.assertEqual(self.installed(), ("build-1", "catalog-1"))
+        self.assertFalse(self.run_recipe("rollback", "home-01", "u2"))
+        self.assertIn(hashlib.sha256(b"build-1").hexdigest(), (self.backup / "installed-home.sha256").read_text())
+
+    @runs_on_tv
+    def test_a_replaced_launcher_or_another_profile_refuses_apply(self):
+        self.stage_build("build-2")
+        self.environment["QUIET_LAUNCHER_APP"], self.environment["QUIET_LAUNCHER_DLL"] = "other.host", "Host.dll"
+        self.assertFalse(self.run_recipe("apply", "home-01", "u2"))
+        del self.environment["QUIET_LAUNCHER_APP"], self.environment["QUIET_LAUNCHER_DLL"]
+        self.dll.write_text("vendor update")
+        self.assertFalse(self.run_recipe("apply", "home-01", "u2"))
+        self.assertIn("not the Quiet Home build", self.last.stderr)
+        self.assertFalse((self.backup / "updates").exists())
+        self.assertEqual((self.app / "res/quiet-home/apps.json").read_text(), "catalog-1")
 
 
 if __name__ == "__main__":

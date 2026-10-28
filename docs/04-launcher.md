@@ -186,6 +186,30 @@ Before each frame the recipe closes Samsung's screen saver
 setting itself is left on. The script still refuses to write `docs/screens/`
 if a frame comes out black, for example when the screen turned off.
 
+## Install a newer build
+
+A later build replaces the installed one without restoring Samsung's
+launcher first. Name the snapshot Quiet Home was installed from and give each
+update its own name:
+
+```sh
+tar -czf .local/package.tar.gz -C .local/package .
+tv push .local/package.tar.gz package.tar.gz
+tv exec --script recipes/update-launcher.sh --arg apply --arg home-01 --arg visual-01
+tv exec --script recipes/update-launcher.sh --arg rollback --arg home-01 --arg visual-01
+```
+
+`apply` refuses to run when the installed DLL no longer matches the
+snapshot's `installed-home.sha256`, for example after a vendor app update, or
+when a cached native image has returned. It keeps the previous DLL and
+resources in `updates/visual-01/` of the snapshot folder, installs the new
+build with the original's file mode and SMACK label, records the new digest
+and relaunches the container. Home and startup selectors are unchanged.
+
+`rollback` returns the build the update replaced, newest update first.
+`restore-launcher.sh` still restores Samsung's original container from the
+same snapshot after any number of updates.
+
 ## Make it open on Home and startup
 
 Save the **three original values** privately first: the main-operation Home

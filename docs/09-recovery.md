@@ -82,6 +82,9 @@ It then removes Quiet Home's `res/quiet-home` from the container, so a new
 snapshot can back up the original container and Quiet Home can be installed
 again. Each install needs its own snapshot.
 
+To undo only a later Quiet Home build, roll that update back instead:
+`recipes/update-launcher.sh` with `rollback`, the snapshot and the update name.
+
 Allow temporary root cleanup to finish, then restart and test picture,
 sound, HDMI, Home, settings and remote. Restore only the optional cleanup
 groups the owner wants back; restoring Home does not require turning every
