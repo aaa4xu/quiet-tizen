@@ -4,7 +4,8 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
     <IsPackable>false</IsPackable>
     <!-- Every public type and member needs a /// comment (AGENTS.md, "C# code"); the build fails without one. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

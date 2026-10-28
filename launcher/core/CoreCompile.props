@@ -5,6 +5,9 @@
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>10</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <!-- Core code states where null is allowed and the build fails on a possible null dereference.
+         launcher/tizen/Home.cs opts out with #nullable disable until it is rewritten. -->
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
   </PropertyGroup>
 </Project>
