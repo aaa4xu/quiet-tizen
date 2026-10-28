@@ -76,7 +76,7 @@ public static class ScreenBuilder
         return new HomePageModel(inputs, dock);
     }
 
-    /// <summary>Returns the open page of the Apps grid with the app count and, for a catalog over one page, the page number.</summary>
+    /// <summary>Returns the open page of the Apps grid with, for a catalog over one page, the page number.</summary>
     static AppsPageModel AppsPage(ScreenState state)
     {
         var library = state.Library;
@@ -85,9 +85,8 @@ public static class ScreenBuilder
         int start = state.LibraryPage * CatalogGrid.PageSize;
         for (int i = 0; i < CatalogGrid.VisibleCount(library.Count, state.LibraryPage); i++)
             apps.Add(new AppCardModel(i, library[start + i]) { Focused = IsFocused(state, i) });
-        string count = library.Count(a => !a.Utility) + " apps";
         string? pageText = pages > 1 ? state.LibraryPage + 1 + " / " + pages : null;
-        return new AppsPageModel(apps, library.Count == 0, count, pageText);
+        return new AppsPageModel(apps, library.Count == 0, pageText);
     }
 
     /// <summary>Returns the Settings page's tiles with their current values.</summary>

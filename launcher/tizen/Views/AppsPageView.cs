@@ -4,7 +4,7 @@ namespace QuietHome.TizenHost.Views;
 
 /// <summary>
 /// Draws the Apps page from an <see cref="AppsPageModel"/>: one page of the app grid with
-/// the counters above it. <see cref="HomeView"/> calls it during a rebuild.
+/// the page number above it. <see cref="HomeView"/> calls it during a rebuild.
 /// </summary>
 static class AppsPageView
 {
@@ -20,9 +20,8 @@ static class AppsPageView
         }
         foreach (var appCard in page.Apps)
             BuildCard(canvas, appCard);
-        scene.Text(page.CountText, Layout.AppCount, Layout.AppCounterSize, palette.Muted);
         if (page.PagesText != null)
-            scene.TextEnd(page.PagesText, Layout.AppPages, Layout.AppCounterSize, palette.Muted);
+            scene.TextEnd(page.PagesText, Layout.AppPages, Layout.AppPagesSize, palette.Muted);
     }
 
     /// <summary>Adds one app card with its shadow, artwork, focus ring and name.</summary>

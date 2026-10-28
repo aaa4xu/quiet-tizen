@@ -26,12 +26,11 @@ public sealed record HomePageModel(IReadOnlyList<InputCardModel> Inputs, IReadOn
     public override IReadOnlyList<CardModel> Cards => Inputs.Concat<CardModel>(Dock).ToList();
 }
 
-/// <summary>The Apps page: one page of the catalog grid with its counters.</summary>
+/// <summary>The Apps page: one page of the catalog grid with its page number.</summary>
 /// <param name="Apps">The cards on the open page of the grid.</param>
 /// <param name="LoadFailed">True when the catalog has no apps; the page then says "Apps could not be loaded.".</param>
-/// <param name="CountText">The number of apps, for example "9 apps".</param>
 /// <param name="PagesText">The page number, for example "1 / 2", or null when everything fits on one page.</param>
-public sealed record AppsPageModel(IReadOnlyList<AppCardModel> Apps, bool LoadFailed, string CountText, string? PagesText) : PageModel
+public sealed record AppsPageModel(IReadOnlyList<AppCardModel> Apps, bool LoadFailed, string? PagesText) : PageModel
 {
     /// <summary>Text shown instead of the grid.</summary>
     public const string LoadFailedText = "Apps could not be loaded.";

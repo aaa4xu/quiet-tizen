@@ -76,14 +76,13 @@ public class ScreenBuilderTests
         Assert.DoesNotContain(screen.Cards, c => c.Focused);
     }
 
-    /// <summary>The Apps page shows one page of the grid, counts only real apps and tells how to reach the previous page.</summary>
+    /// <summary>The Apps page shows one page of the grid and tells how to reach the previous page.</summary>
     [Fact]
     public void AppsSecondPage()
     {
         var screen = ScreenBuilder.Build(State(Page.Apps, Zone.FirstRow, 2, Apps(20, utilityAt: 19), libraryPage: 1));
         var page = Assert.IsType<AppsPageModel>(screen.Content);
         Assert.Equal(new[] { "App 16", "App 17", "App 18", "App 19", "App 20" }, page.Apps.Select(a => a.Name));
-        Assert.Equal("19 apps", page.CountText);
         Assert.Equal("2 / 2", page.PagesText);
         Assert.False(page.LoadFailed);
         Assert.Equal("Up for previous apps · Back to Home", screen.Chrome.Hint);

@@ -73,14 +73,20 @@ static class Layout
     /// <summary>Left margin of the page content.</summary>
     public const int Margin = 80;
 
+    /// <summary>
+    /// Top edge of the page content under the title and the tabs: the input cards, the first
+    /// row of app cards and of Settings tiles, and the messages shown in their place.
+    /// </summary>
+    public const int ContentTop = 262;
+
     /// <summary>"No connected inputs found." on the Home page.</summary>
-    public static readonly Box NoInputs = new(80, 420, 1500, 70);
+    public static readonly Box NoInputs = new(80, ContentTop, 1500, 70);
 
     /// <summary>Font size of "No connected inputs found.".</summary>
     public const float NoInputsSize = 34;
 
     /// <summary>Top edge of the input cards.</summary>
-    public const int InputY = 262;
+    public const int InputY = ContentTop;
 
     /// <summary>Height of the input cards.</summary>
     public const int InputHeight = 442;
@@ -150,7 +156,7 @@ static class Layout
     public const int AppColumnStep = 358, AppRowStep = 253;
 
     /// <summary>Top edge of the first row of app cards.</summary>
-    public const int AppTop = 266;
+    public const int AppTop = ContentTop;
 
     /// <summary>Gap between an app card and its name, height of the name and its font size.</summary>
     public const int AppNameGap = 13, AppNameHeight = 38;
@@ -158,17 +164,14 @@ static class Layout
     /// <summary>Font size of the app name under its card.</summary>
     public const float AppNameSize = 27;
 
-    /// <summary>"N apps" above the grid.</summary>
-    public static readonly Box AppCount = new(80, 218, 500, 30);
-
     /// <summary>"1 / 2" above the grid, right-aligned.</summary>
     public static readonly Box AppPages = new(1650, 218, 190, 30);
 
-    /// <summary>Font size of the counters above the grid.</summary>
-    public const float AppCounterSize = 21;
+    /// <summary>Font size of the page number above the grid.</summary>
+    public const float AppPagesSize = 21;
 
     /// <summary>"Apps could not be loaded." on the Apps page.</summary>
-    public static readonly Box AppsLoadFailed = new(80, 300, 1500, 70);
+    public static readonly Box AppsLoadFailed = new(80, ContentTop, 1500, 70);
 
     /// <summary>Font size of "Apps could not be loaded.".</summary>
     public const float AppsLoadFailedSize = 32;
@@ -180,7 +183,7 @@ static class Layout
     public const int TileColumnStep = 450, TileRowStep = 332;
 
     /// <summary>Top edge of the first row of tiles.</summary>
-    public const int TileTop = 262;
+    public const int TileTop = ContentTop;
 
     /// <summary>The tile's title, value and hint, relative to the tile.</summary>
     public static readonly Box TileTitle = new(26, 25, 348, 42), TileValue = new(26, 151, 358, 56), TileHint = new(26, 226, 370, 34);

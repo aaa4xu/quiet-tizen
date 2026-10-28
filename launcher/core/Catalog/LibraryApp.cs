@@ -38,9 +38,8 @@ public sealed class LibraryApp
     public float[]? Crop { get; set; }
 
     /// <summary>
-    /// Marks a helper card such as "Get more apps": it is not counted as an app and
-    /// never goes to the dock. In the dark theme it is drawn in theme colors instead of
-    /// <see cref="Background"/>.
+    /// Marks a helper card such as "Get more apps": it never goes to the dock. In the dark
+    /// theme it is drawn in theme colors instead of <see cref="Background"/>.
     /// </summary>
     public bool Utility { get; set; }
 }
