@@ -3,7 +3,7 @@ namespace QuietHome.Core.Navigation;
 /// <summary>
 /// Which setting the remote is adjusting on the Settings page. While it is not
 /// <see cref="None"/>, Left and Right change that setting instead of moving focus
-/// (see <see cref="Navigator"/>), and Select or Back finish the adjustment.
+/// (see <see cref="Navigator"/>), and Select, Back or Exit finish the adjustment.
 /// </summary>
 public enum Adjustment
 {

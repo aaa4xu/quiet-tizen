@@ -226,10 +226,11 @@ public class NavigatorTests
         Assert.Equal((Zone.FirstRow, 0), (navigator.Zone, navigator.Selected));
     }
 
-    /// <summary>While adjusting, Left and Right change the setting, other keys do nothing, and Select or Back finish.</summary>
+    /// <summary>While adjusting, Left and Right change the setting, other keys do nothing, and Select, Back or Exit finish.</summary>
     [Theory]
     [InlineData(RemoteKey.Select)]
     [InlineData(RemoteKey.Back)]
+    [InlineData(RemoteKey.Exit)]
     public void Adjusting(RemoteKey finish)
     {
         var navigator = At(Page.Settings, Zone.FirstRow, 1);

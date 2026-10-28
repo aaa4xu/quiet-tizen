@@ -152,8 +152,8 @@ public sealed class Navigator
     }
 
     /// <summary>
-    /// Handles a key while a setting is being adjusted: Left and Right change it, Select or
-    /// Back finish the adjustment, other keys do nothing.
+    /// Handles a key while a setting is being adjusted: Left and Right change it, Select,
+    /// Back or Exit finish the adjustment, other keys do nothing.
     /// </summary>
     KeyOutcome HandleAdjustKey(RemoteKey key)
     {
@@ -165,6 +165,7 @@ public sealed class Navigator
                 return KeyOutcome.AdjustUp;
             case RemoteKey.Select:
             case RemoteKey.Back:
+            case RemoteKey.Exit:
                 Adjusting = Adjustment.None;
                 return KeyOutcome.Refocus;
             default:
