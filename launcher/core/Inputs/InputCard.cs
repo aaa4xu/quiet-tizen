@@ -5,8 +5,8 @@ namespace QuietHome.Core.Inputs;
 
 /// <summary>
 /// The text of one input card on the Home page: the big name under the card and the
-/// smaller line below it. The TV host builds one per connected <see cref="InputSource"/>
-/// and draws the TV's own icon on the card.
+/// smaller line below it. <see cref="Screens.ScreenBuilder"/> gets one per connected
+/// <see cref="InputSource"/>; the TV view draws the TV's own icon on the card.
 /// </summary>
 public sealed class InputCard
 {

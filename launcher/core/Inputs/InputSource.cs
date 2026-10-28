@@ -2,7 +2,7 @@ namespace QuietHome.Core.Inputs;
 
 /// <summary>
 /// One input as the TV's source list reports it (libsource-api's <c>get_source_list</c>
-/// returns a JSON array of these). The TV host reads the list, <see cref="InputList.Parse"/>
+/// returns a JSON array of these). The TV's input port reads the list, <see cref="InputList.Parse"/>
 /// turns it into these objects, and <see cref="InputCard"/> decides what the Home page shows.
 /// Property names match the JSON fields, compared without case.
 /// </summary>

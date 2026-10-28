@@ -4,8 +4,9 @@ namespace QuietHome.Core.Actions;
 
 /// <summary>
 /// What happens when the owner presses Select on a card, tile or toolbar button. Each card
-/// the TV host draws carries one of these; on Select the host performs it (switches the
-/// input, launches an app, changes a setting). Keeping the actions as data instead of
+/// model from <see cref="Screens.ScreenBuilder"/> carries one of these; on Select
+/// <see cref="HomeController"/> performs it through the platform ports (switches the input,
+/// launches an app, changes a setting). Keeping the actions as data instead of
 /// strings lets the core describe pages and lets tests check which action a card has.
 /// </summary>
 public abstract record HomeAction

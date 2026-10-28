@@ -5,10 +5,10 @@ namespace QuietHome.Core.Navigation;
 /// <summary>
 /// Remote control navigation for all three pages: which page is shown, which zone and
 /// slot have focus, which Apps page is open and whether a setting is being adjusted.
-/// The TV host owns one navigator, passes every accepted key to <see cref="HandleKey"/>
-/// together with the current page's <see cref="SlotRows"/>, and then does what the returned
-/// <see cref="KeyOutcome"/> says. The host also sets the state directly when the TV asks
-/// for a page (Home key, launch options).
+/// <see cref="HomeController"/> owns one navigator, passes every accepted key to
+/// <see cref="HandleKey"/> together with the current page's <see cref="SlotRows"/>, and then
+/// does what the returned <see cref="KeyOutcome"/> says. The controller also sets the state
+/// directly when the TV asks for a page (Home key, launch options).
 /// </summary>
 public sealed class Navigator
 {
@@ -32,7 +32,7 @@ public sealed class Navigator
     public Adjustment Adjusting { get; set; }
 
     /// <summary>
-    /// Updates the focus for one key press and returns what the host must do next.
+    /// Updates the focus for one key press and returns what the controller must do next.
     /// <paramref name="rows"/> describes the page on screen; <paramref name="catalogCount"/>
     /// is the number of apps in the catalog, for the Apps page grid.
     /// </summary>
@@ -75,7 +75,7 @@ public sealed class Navigator
     }
 
     /// <summary>
-    /// Fixes the focus after the host has drawn a page: keeps <see cref="Selected"/> within
+    /// Fixes the focus for a page about to be drawn: keeps <see cref="Selected"/> within
     /// the page's slots and moves focus off a row that has no cards (see <see cref="LeaveEmptyRow"/>).
     /// </summary>
     public void SettleAfterBuild(SlotRows rows)

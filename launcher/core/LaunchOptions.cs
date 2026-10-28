@@ -5,7 +5,8 @@ namespace QuietHome.Core;
 
 /// <summary>
 /// Options a launch request can carry as app-control extras. The TV host reads them from
-/// every request it receives, including requests to the already running app:
+/// every request it receives, including requests to the already running app, and
+/// <see cref="HomeController.AppControl"/> applies them:
 /// <c>quiet_demo=1</c> turns demo mode on (any launch without it turns it off),
 /// <c>quiet_theme=light|dark</c> overrides the theme until demo mode ends, and
 /// <c>quiet_page=apps|settings</c> opens that page. The README screenshot recipe uses all three.

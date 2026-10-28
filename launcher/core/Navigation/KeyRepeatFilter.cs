@@ -3,7 +3,7 @@ namespace QuietHome.Core.Navigation;
 /// <summary>
 /// Drops a key that arrives again too soon after the same key. Holding a direction key on
 /// the remote sends a fast stream of repeats; without this filter focus would race across
-/// the page. The TV host asks <see cref="Accept"/> for every key press before handling it.
+/// the page. <see cref="HomeController"/> asks <see cref="Accept"/> for every key press before handling it.
 /// The time is passed in, so tests need no clock.
 /// </summary>
 public sealed class KeyRepeatFilter

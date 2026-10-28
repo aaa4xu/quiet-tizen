@@ -7,7 +7,7 @@ namespace QuietHome.Core.Settings;
 
 /// <summary>
 /// The latest values of the TV settings that the Settings page shows and changes: volume,
-/// brightness, game mode and sleep timer. The TV host fills it with <see cref="Refresh"/>
+/// brightness, game mode and sleep timer. <see cref="HomeController"/> fills it with <see cref="Refresh"/>
 /// from an <see cref="IQuickSettings"/> each time the page is shown or a setting is changed; this class holds the
 /// values and the rules for the next value (for example, the sleep timer's next step),
 /// so those rules can be tested without the TV. Setting IDs are Samsung's own
@@ -29,7 +29,7 @@ public sealed class QuickSettingsState
     /// </summary>
     public static IReadOnlyList<string> GameModeIds { get; } = new[] { "game-mode-setting-game-mode-auto", "game-mode" };
 
-    /// <summary>The settings the TV host reads from Samsung's settings API on every refresh.</summary>
+    /// <summary>The settings <see cref="Refresh"/> reads from Samsung's settings API (through <see cref="IQuickSettings"/>) every time.</summary>
     public static IReadOnlyList<string> TvSettingIds { get; } = new[] { "brightness", GameModeIds[0], GameModeIds[1], "sleeptimer" };
 
     /// <summary>Text shown for a setting the TV did not report.</summary>

@@ -4,9 +4,10 @@ using System.Text.Json;
 namespace QuietHome.Core.Inputs;
 
 /// <summary>
-/// Reads the TV's source list and tells whether it changed. The TV host gets the JSON text
-/// from libsource-api, passes it to <see cref="Parse"/>, and compares
-/// <see cref="Fingerprint"/> before and after to decide whether the Home page must be redrawn.
+/// Reads the TV's source list and tells whether it changed. The Tizen input port gets the
+/// JSON text from libsource-api and passes it to <see cref="Parse"/>;
+/// <see cref="HomeController"/> compares <see cref="Fingerprint"/> before and after to decide
+/// whether the Home page must be redrawn.
 /// </summary>
 public static class InputList
 {

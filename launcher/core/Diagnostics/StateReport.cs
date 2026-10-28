@@ -7,7 +7,7 @@ namespace QuietHome.Core.Diagnostics;
 /// The content of the diagnostics file <c>/tmp/quiet-home-state.txt</c>: one
 /// <c>key=value</c> line per value after a timestamp. Tools on the computer read it over SDB
 /// (tools/screens.py, tools/screen_compare.py, recipes), so the keys and their order must not
-/// change. The TV host fills one after every change and writes <see cref="Format"/> through
+/// change. <see cref="HomeController"/> fills one after every change and writes <see cref="Format"/> through
 /// <see cref="Platform.IDiagnostics"/>.
 /// </summary>
 public sealed class StateReport

@@ -8,7 +8,9 @@ namespace QuietHome.Core.Platform.Demo;
 /// The inputs in demo mode (<c>quiet_demo=1</c>): the Home page shows fixed sample inputs,
 /// so README screenshots do not show the owner's devices. Everything else (the input on
 /// screen, switching, change notices) still goes to the TV, so Back returns to the real
-/// picture. The TV host passes the samples, because their icon paths depend on the TV.
+/// picture. <see cref="HomeController"/> puts it in front of the TV's inputs while demo
+/// mode is on; the TV host passes the samples in <see cref="HomeConfig"/>, because their
+/// icon paths depend on the TV.
 /// </summary>
 public sealed class DemoInputSources : IInputSources
 {

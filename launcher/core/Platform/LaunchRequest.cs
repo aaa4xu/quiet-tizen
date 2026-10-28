@@ -2,7 +2,7 @@ namespace QuietHome.Core.Platform;
 
 /// <summary>
 /// What <see cref="ISystemLauncher"/> should open: an app ID and, for Samsung's settings, the
-/// screen inside it. The TV host creates one for each card action that leaves Quiet Home and
+/// screen inside it. <see cref="HomeController"/> creates one for each card action that leaves Quiet Home and
 /// writes <see cref="Activity"/> to the diagnostics file after sending it.
 /// </summary>
 /// <param name="AppId">Tizen ID of the app to open.</param>

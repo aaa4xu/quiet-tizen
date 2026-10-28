@@ -1,7 +1,7 @@
 namespace QuietHome.Core.Platform;
 
 /// <summary>
-/// What <see cref="ISystemLauncher.Launch"/> reports. The TV host shows "Could not open the
+/// What <see cref="ISystemLauncher.Launch"/> reports. <see cref="HomeController"/> shows "Could not open the
 /// app." when the request could not even be created, and "Could not open this screen." when
 /// sending it failed.
 /// </summary>

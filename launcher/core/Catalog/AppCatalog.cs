@@ -9,7 +9,7 @@ namespace QuietHome.Core.Catalog;
 
 /// <summary>
 /// Loads and checks the app catalog, and picks the apps for the dock on the Home page.
-/// The TV host loads the owner's catalog at start and the public one for demo mode;
+/// <see cref="HomeController"/> loads the owner's catalog at start and the public one for demo mode;
 /// <see cref="CatalogGrid"/> then lays the apps out on the Apps page.
 /// </summary>
 public static class AppCatalog

@@ -5,8 +5,8 @@ namespace QuietHome.Core.Platform;
 
 /// <summary>
 /// The clock text in the top right corner of every page, from the time an
-/// <see cref="IClock"/> gives. The TV host sets the label from it when it draws a page and
-/// every 30 seconds.
+/// <see cref="IClock"/> gives. <see cref="HomeController"/> formats it for every page it
+/// shows and every 30 seconds; the TV view only sets the label.
 /// </summary>
 public static class ClockText
 {

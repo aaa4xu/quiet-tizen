@@ -1,9 +1,9 @@
 namespace QuietHome.Core.Navigation;
 
 /// <summary>
-/// What the TV host must do after <see cref="Navigator.HandleKey"/> has updated the focus.
-/// The navigator only changes its own state; drawing, launching and switching inputs are
-/// the host's work, and this value tells it which one.
+/// What <see cref="HomeController"/> must do after <see cref="Navigator.HandleKey"/> has
+/// updated the focus. The navigator only changes its own state; drawing, launching and
+/// switching inputs are the controller's work, and this value tells it which one.
 /// </summary>
 public enum KeyOutcome
 {

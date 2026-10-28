@@ -6,8 +6,9 @@ namespace QuietHome.Core.Catalog;
 /// <summary>
 /// The Apps page arithmetic: how the catalog splits into pages of <see cref="Columns"/> ×
 /// <see cref="Rows"/> cards and where focus goes when a direction key is pressed. It knows
-/// nothing about drawing; <see cref="Navigator"/> and the TV host ask it for numbers
-/// (catalog indexes, page counts) and draw the cards themselves.
+/// nothing about drawing; <see cref="Navigator"/>, <see cref="Screens.ScreenBuilder"/> and
+/// <see cref="HomeController"/> ask it for numbers (catalog indexes, page counts), and the
+/// TV view draws the cards.
 /// </summary>
 public static class CatalogGrid
 {

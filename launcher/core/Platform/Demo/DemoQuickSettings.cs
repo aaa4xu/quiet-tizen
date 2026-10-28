@@ -6,8 +6,8 @@ namespace QuietHome.Core.Platform.Demo;
 /// <summary>
 /// The quick settings in demo mode (<c>quiet_demo=1</c>): fixed sample values (volume 20,
 /// brightness 45, game mode Off, sleep timer Off) kept in memory. Changing them on the
-/// Settings page works as on the TV but changes nothing on the TV. The TV host creates a
-/// new one each time demo mode starts, so every demo starts from the same values.
+/// Settings page works as on the TV but changes nothing on the TV. <see cref="HomeController"/>
+/// creates a new one each time demo mode starts, so every demo starts from the same values.
 /// </summary>
 public sealed class DemoQuickSettings : IQuickSettings
 {
