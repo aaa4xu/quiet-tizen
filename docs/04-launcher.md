@@ -240,7 +240,10 @@ were changed together, so which one mattered is unknown.
 ## Replace the slow settings/sidebar path
 
 The quick settings page handles volume, brightness, Game Mode and sleep
-timer with native APIs. Availability is checked for the current input. Its
+timer with native APIs. Availability is checked for the current input.
+Where the TV's menu offers Game Mode Auto (the S95F does), the Game Mode card
+steps Auto → On → Off and shows the TV's own name for the value; on TVs with
+only the older on/off item it toggles On and Off. Its
 Theme card switches between the default dark theme and the light one; the
 choice is saved in the container's data directory. Mute stays on the remote.
 Advanced settings, network setup and Bluetooth pairing still use Samsung's

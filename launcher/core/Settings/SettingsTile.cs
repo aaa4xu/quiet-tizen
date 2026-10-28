@@ -49,7 +49,7 @@ public sealed class SettingsTile
     {
         new SettingsTile("volume", "Volume", "Select · Left / Right to adjust", "volume", 0, 0, new HomeAction.BeginAdjust(Adjustment.Volume)),
         new SettingsTile("brightness", "Brightness", "Select · Left / Right to adjust", "brightness", 1, 0, new HomeAction.BeginAdjust(Adjustment.Brightness)),
-        new SettingsTile("game-mode", "Game Mode", "Select to switch on or off", "game", 2, 0, new HomeAction.ToggleSetting("game-mode")),
+        new SettingsTile("game-mode", "Game Mode", "Select to change the mode", "game", 2, 0, new HomeAction.SwitchGameMode()),
         new SettingsTile("sleeptimer", "Sleep Timer", "Select to change the timer", "sleep", 3, 0, new HomeAction.CycleSetting("sleeptimer")),
         new SettingsTile("theme", "Theme", "Select to switch dark or light", "theme", 0, 1, new HomeAction.ToggleTheme()),
         new SettingsTile("controllers", "Controllers", "DualSense · hold PS + Create", "controller", 1, 1, new HomeAction.OpenSamsungSettings("add-bluetooth-keyboard")),
@@ -66,7 +66,7 @@ public sealed class SettingsTile
     {
         "volume" => demo ? "20" : settings.Volume < 0 ? QuickSettingsState.Unavailable : settings.Volume.ToString(),
         "brightness" => demo ? "45" : settings.Name("brightness"),
-        "game-mode" => demo ? "Off" : settings.Name("game-mode"),
+        "game-mode" => demo ? "Off" : settings.Name(settings.GameModeId),
         "sleeptimer" => demo ? "Off" : settings.Name("sleeptimer"),
         "theme" => dark ? "Dark" : "Light",
         "controllers" => "Pair controller",

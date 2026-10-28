@@ -426,14 +426,14 @@ public sealed class QuietHomeApplication : NUIApplication
    case HomeAction.OpenSamsungSettings menu:Launch("org.tizen.menu",menu.MenuItem);return;
    case HomeAction.OpenSourceEditor:Launch("com.samsung.tv.csfs");return;
    case HomeAction.BeginAdjust adjust:RefreshSettings();if(adjust.Target==Adjustment.Brightness&&!settings.CanEdit("brightness")){ShowError("Brightness is unavailable for the current input.");return;}navigator.Adjusting=adjust.Target;UpdateFocus();return;
-   case HomeAction.ToggleSetting toggle:RefreshSettings();SetSetting(toggle.Id,settings.NextToggleValue(toggle.Id));return;
+   case HomeAction.SwitchGameMode:RefreshSettings();var mode=settings.NextGameModeValue();if(mode!=null)SetSetting(settings.GameModeId,mode);return;
    case HomeAction.CycleSetting cycle:RefreshSettings();var next=settings.NextCycleValue(cycle.Id);if(next!=null)SetSetting(cycle.Id,next);return;
    case HomeAction.ToggleTheme:ToggleTheme();return;
   }
  }
  void RefreshSettings(){
   settings.Volume=sound_manager_get_master_volume(out var v)==0?v:-1;
-  foreach(var id in new[]{"brightness","game-mode","sleeptimer"}){
+  foreach(var id in QuickSettingsState.TvSettingIds){
    try{bool read=CSharpGetItemValue(id,out var name,out var value);settings.Record(id,name,read?value:null);
     settings.SetEnabled(id,CSharpGetItemEnable(id,out var enabled)&&enabled);
    }catch{settings.Forget(id);}
@@ -468,6 +468,6 @@ public sealed class QuietHomeApplication : NUIApplication
    if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
  }
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+keys.LastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\ndemo="+demo+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+navigator.Adjusting.Name()+"\nvolume="+settings.Volume+"\nbrightness="+settings.Value("brightness")+"\ngame-mode="+settings.Value("game-mode")+"\nsleeptimer="+settings.Value("sleeptimer")+"\n");}catch{}}
+ void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+keys.LastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\ndemo="+demo+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+navigator.Adjusting.Name()+"\nvolume="+settings.Volume+"\nbrightness="+settings.Value("brightness")+"\ngame-mode="+settings.Value(settings.GameModeId)+"\nsleeptimer="+settings.Value("sleeptimer")+"\n");}catch{}}
  public static void Main(string[] args){using(var app=new QuietHomeApplication())app.Run(args);}
 }

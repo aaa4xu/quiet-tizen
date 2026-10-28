@@ -32,8 +32,8 @@ public abstract record HomeAction
     /// <summary>Start adjusting volume or brightness with Left and Right.</summary>
     public sealed record BeginAdjust(Adjustment Target) : HomeAction;
 
-    /// <summary>Turn an on/off TV setting (game mode) the other way.</summary>
-    public sealed record ToggleSetting(string Id) : HomeAction;
+    /// <summary>Move game mode to its next value (see <see cref="Settings.QuickSettingsState.NextGameModeValue"/>).</summary>
+    public sealed record SwitchGameMode : HomeAction;
 
     /// <summary>Move a TV setting with several choices (sleep timer) to its next choice.</summary>
     public sealed record CycleSetting(string Id) : HomeAction;

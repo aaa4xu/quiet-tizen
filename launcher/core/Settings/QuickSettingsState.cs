@@ -10,7 +10,7 @@ namespace QuietHome.Core.Settings;
 /// sound APIs each time the page is shown or a setting is changed; this class holds the
 /// values and the rules for the next value (for example, the sleep timer's next step),
 /// so those rules can be tested without the TV. Setting IDs are Samsung's own
-/// ("brightness", "game-mode", "sleeptimer").
+/// ("brightness", "game-mode", "sleeptimer"); <see cref="TvSettingIds"/> lists them all.
 /// </summary>
 public sealed class QuickSettingsState
 {
@@ -20,6 +20,16 @@ public sealed class QuickSettingsState
 
     /// <summary>Number of sleep timer choices on this TV, including off (0).</summary>
     public const int SleepTimerChoices = 5;
+
+    /// <summary>
+    /// Samsung's IDs for game mode, preferred first. The S95F menu shows the first one; it
+    /// reports Off "0", On "1" and Auto "2". The second is the older on/off item, which is
+    /// empty while Auto is set; it is kept for TVs that do not have the first one.
+    /// </summary>
+    public static IReadOnlyList<string> GameModeIds { get; } = new[] { "game-mode-setting-game-mode-auto", "game-mode" };
+
+    /// <summary>The settings the TV host reads from Samsung's settings API on every refresh.</summary>
+    public static IReadOnlyList<string> TvSettingIds { get; } = new[] { "brightness", GameModeIds[0], GameModeIds[1], "sleeptimer" };
 
     /// <summary>Text shown for a setting the TV did not report.</summary>
     public const string Unavailable = "Unavailable";
@@ -106,8 +116,30 @@ public sealed class QuickSettingsState
         return Math.Max(BrightnessMin, Math.Min(BrightnessMax, n + delta * BrightnessStep)).ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Returns the value of on/off setting <paramref name="id"/> (game mode) after a toggle: "0" when it is on ("1") now, otherwise "1".</summary>
-    public string NextToggleValue(string id) => Value(id) == "1" ? "0" : "1";
+    /// <summary>
+    /// The game mode item the Settings page shows and changes: the first of
+    /// <see cref="GameModeIds"/> that has a value, or the older on/off item when none has.
+    /// </summary>
+    public string GameModeId => values.ContainsKey(GameModeIds[0]) ? GameModeIds[0] : GameModeIds[1];
+
+    /// <summary>
+    /// Returns the game mode value after one Select on its tile. The item with Auto steps
+    /// Auto "2" → On "1" → Off "0" → Auto, and returns null for any other value, so nothing
+    /// is changed. The older on/off item toggles: "0" when it is on ("1") now, otherwise "1".
+    /// </summary>
+    public string? NextGameModeValue()
+    {
+        string value = Value(GameModeId);
+        if (GameModeId != GameModeIds[0])
+            return value == "1" ? "0" : "1";
+        return value switch
+        {
+            "2" => "1",
+            "1" => "0",
+            "0" => "2",
+            _ => null,
+        };
+    }
 
     /// <summary>
     /// Returns the value of setting <paramref name="id"/> after one Select on a tile that

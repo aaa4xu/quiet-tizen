@@ -21,6 +21,7 @@ public class SettingsTests
         Assert.Equal(new[] { 0, 1, 2, 3, 0, 1, 2, 3 }, tiles.Select(t => t.Column));
         Assert.Equal(new[] { 0, 0, 0, 0, 1, 1, 1, 1 }, tiles.Select(t => t.Row));
         Assert.Equal(new HomeAction.BeginAdjust(Adjustment.Brightness), tiles[1].Action);
+        Assert.Equal(new HomeAction.SwitchGameMode(), tiles[2].Action);
         Assert.Equal(new HomeAction.CycleSetting("sleeptimer"), tiles[3].Action);
         Assert.Equal(new HomeAction.OpenSamsungSettings("networksettings"), tiles[6].Action);
         Assert.Equal(new HomeAction.OpenSamsungSettings(null), tiles[7].Action);
@@ -92,16 +93,48 @@ public class SettingsTests
         Assert.Null(state.NextBrightness(1));
     }
 
-    /// <summary>Game mode toggles between "0" and "1"; anything but "1" counts as off.</summary>
+    /// <summary>
+    /// The Game Mode tile shows the TV's item that knows Auto when the TV reports it, even
+    /// while the older on/off item is empty (as it is in Auto), and falls back to the older
+    /// item on a TV without the new one.
+    /// </summary>
+    [Fact]
+    public void GameModePrefersTheItemWithAuto()
+    {
+        var state = new QuickSettingsState();
+        var tile = SettingsTile.All[2];
+        state.Record("game-mode", "On", "1");
+        Assert.Equal("game-mode", state.GameModeId);
+        Assert.Equal("On", tile.ValueText(state, dark: true, demo: false));
+        state.Record("game-mode", "----", "");
+        state.Record("game-mode-setting-game-mode-auto", "Auto", "2");
+        Assert.Equal("game-mode-setting-game-mode-auto", state.GameModeId);
+        Assert.Equal("Auto", tile.ValueText(state, dark: true, demo: false));
+    }
+
+    /// <summary>Select steps game mode Auto → On → Off → Auto; an unknown value changes nothing.</summary>
+    [Theory]
+    [InlineData("2", "1")]
+    [InlineData("1", "0")]
+    [InlineData("0", "2")]
+    [InlineData("3", null)]
+    public void GameModeCycles(string current, string? expected)
+    {
+        var state = new QuickSettingsState();
+        state.Record("game-mode-setting-game-mode-auto", "x", current);
+        Assert.Equal(expected, state.NextGameModeValue());
+    }
+
+    /// <summary>On a TV with only the older on/off item, game mode toggles between "0" and "1"; anything but "1" counts as off.</summary>
     [Theory]
     [InlineData("1", "0")]
     [InlineData("0", "1")]
     [InlineData("2", "1")]
-    public void GameModeToggles(string current, string expected)
+    public void GameModeTogglesWithoutAuto(string current, string expected)
     {
         var state = new QuickSettingsState();
         state.Record("game-mode", "x", current);
-        Assert.Equal(expected, state.NextToggleValue("game-mode"));
+        Assert.Equal(expected, state.NextGameModeValue());
     }
 
     /// <summary>The sleep timer steps through its five choices and wraps to off; a non-number changes nothing.</summary>
