@@ -37,6 +37,49 @@ class PackageTests(unittest.TestCase):
                 for essential in essentials:
                     self.assertNotIn(essential, ids)
 
+    def test_profile_fields_and_references(self):
+        # Same character sets the planner and recipes accept; a misspelled key is refused, not ignored.
+        name = r"^[A-Za-z0-9_.-]+$"
+        optional = {"registry", "launcher", "groups", "stop_markers", "runtime_only_masks", "preferences", "was_cache"}
+        for path in sorted((ROOT / "profiles").glob("*.json")):
+            with self.subTest(profile=path.name):
+                profile = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(profile["profile_version"], 1)
+                for key in ("model", "firmware", "os", "kernel", "runtime"):
+                    self.assertIsInstance(profile[key], str)
+                    self.assertTrue(profile[key].strip(), key)
+                self.assertLessEqual(set(profile) - {"profile_version", "model", "firmware", "os", "kernel", "runtime"},
+                                     optional)
+                self.assertRegex(profile["model"], r"^[A-Z0-9]+$")
+                self.assertRegex(profile["firmware"], r"^T-[A-Z0-9]+-[0-9]{4}-[0-9]+\.[0-9]+$")
+                self.assertEqual(path.stem, profile["model"].lower() + "-" + profile["firmware"].rsplit("-", 1)[1])
+                if "launcher" in profile:
+                    self.assertEqual(set(profile["launcher"]), {"app_id", "dll"})
+                groups = profile.get("groups", {})
+                for group, entry in groups.items():
+                    self.assertRegex(group, r"^[a-z0-9]+(-[a-z0-9]+)*$")
+                    self.assertEqual(set(entry), {"description", "app_ids"}, group)
+                    self.assertTrue(entry["description"].strip(), group)
+                    self.assertTrue(entry["app_ids"], group)
+                    for app in entry["app_ids"]:
+                        self.assertRegex(app, name)
+                for marker in profile.get("stop_markers", []):
+                    self.assertEqual(set(marker), {"unit", "marker", "group"})
+                    self.assertRegex(marker["unit"], r"^[A-Za-z0-9_.-]+\.service$")
+                    self.assertRegex(marker["marker"], name)
+                    self.assertIn(marker["group"], list(groups), marker["unit"])
+                units = [marker["unit"] for marker in profile.get("stop_markers", [])]
+                self.assertEqual(len(units), len(set(units)))
+                for unit in profile.get("runtime_only_masks", []):
+                    self.assertRegex(unit, r"^[A-Za-z0-9_.-]+\.service$")
+                for preference in profile.get("preferences", []):
+                    self.assertEqual(set(preference), {"key", "type", "value"})
+                    self.assertRegex(preference["key"], r"^db/[A-Za-z0-9_./-]+$")
+                    self.assertIn(preference["type"], ("string", "bool", "int"))
+                    self.assertIsInstance(preference["value"], str)
+                if "was_cache" in profile:
+                    self.assertEqual(set(profile["was_cache"]), {"table", "row", "json_path", "after"})
+
     @runs_on_tv
     def test_shell_syntax(self):
         for path in (ROOT / "recipes").glob("*.sh"):
