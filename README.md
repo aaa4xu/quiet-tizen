@@ -113,6 +113,7 @@ root access; it does not validate those scripts there.
 9. [Restore the original experience](docs/09-recovery.md).
 10. [Remote app buttons on other models (findings only)](docs/10-remote-buttons.md).
 11. [Samsung's source-list API (findings)](docs/11-source-api.md).
+12. [How the TV shows an HDMI preview and how to add one](docs/12-hdmi-preview.md).
 
 Read [AGENTS.md](AGENTS.md) before using the tools. TV commands require a
 specific address; they read the model and firmware from the TV and check them.
