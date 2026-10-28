@@ -17,7 +17,8 @@ if [ -n "$container" ]; then
     done
     A=/opt/usr/apps/$container
     test -s "$A/bin/$dll"
-    test ! -e "$A/res/quiet-home" # Back up Samsung's container, not an installed launcher.
+    # Back up Samsung's container, not an installed launcher.
+    test ! -e "$A/res/quiet-home" || { echo 'Quiet Home is already installed in this container; keep the earlier snapshot' >&2; exit 1; }
 fi
 mkdir -p "$D"
 for db in .pkgmgr_parser .app-context .webappservice; do

@@ -28,7 +28,8 @@ sha256sum -c "$D/original-assembly.sha256"
 test "$(sha256sum "$A/bin/$dll" | cut -d ' ' -f 1)" = "$(cut -d ' ' -f 1 "$D/original-assembly.sha256")"
 mode=$(cut -d ' ' -f 1 "$D/original-metadata.txt")
 case "$mode" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) exit 1;; esac
-test ! -e "$A/res/quiet-home" # First install only; do not silently overwrite an existing custom launcher.
+# First install only; do not silently overwrite an existing custom launcher.
+test ! -e "$A/res/quiet-home" || { echo 'Quiet Home is already installed in this container' >&2; exit 1; }
 test ! -e "$S/unpacked"
 # One registry row for the container, live and in the snapshot, before touching the package.
 for db in /opt/dbspace/.pkgmgr_parser.db "$D/.pkgmgr_parser.db"; do
