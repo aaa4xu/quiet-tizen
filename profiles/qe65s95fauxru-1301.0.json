@@ -7,6 +7,7 @@
   "runtime": "6.0.9",
   "launcher": {
     "app_id": "com.samsung.tv.adplayer",
-    "dll": "AdPlayer.dll"
+    "dll": "AdPlayer.dll",
+    "settings_route": "quicklaunch"
   }
 }

@@ -233,17 +233,23 @@ tv exec --script recipes/snapshot.sh --arg shell-01
 tv exec --script recipes/install-settings-bridge.sh --arg shell-01
 ```
 
-The recipe routes the keys to the container that holds Quiet Home's
-`res/quiet-home` and stops unless there is exactly one. It records that
-container in `bridge-target.txt` for the restore.
-
 This replaces `/opt/usr/apps/com.samsung.tv.quicklaunch/bin/QuickLaunch.dll`
-and updates two `key_filter` rules:
+and points two `key_filter` rules, `com.samsung.tv.quicklaunch` /
+`XF86More` and `org.tizen.menu` / `XF86SysMenu`, at Quiet Home's settings
+page (`quiet_page:settings`). The profile's `launcher.settings_route`
+chooses how, and `tv exec` passes it to the recipe:
 
-| Rule owner / key | New destination |
-|---|---|
-| `com.samsung.tv.quicklaunch` / `XF86More` | Quiet Home, `quiet_page:settings` |
-| `org.tizen.menu` / `XF86SysMenu` | Quiet Home, `quiet_page:settings` |
+| `settings_route` | Keys launch | Used by |
+|---|---|---|
+| `launcher` (default) | the container that holds `res/quiet-home` | U8000F |
+| `quicklaunch` | the replaced QuickLaunch, which opens Quiet Home | QE65S95F |
+
+On the QE65S95F, a key launch of the AdPlayer container itself opened
+nothing, while the same key sent to QuickLaunch opened Quiet Home's settings,
+also after standby and a restart.
+The Smart Control's settings button sends `XF86More` there. Either way the
+recipe stops unless exactly one container holds `res/quiet-home`, and it
+records the target in `bridge-target.txt` for the restore.
 
 The recipe selects semantic keys and checks the saved values. It does not
 copy another TV's row numbers. It notifies

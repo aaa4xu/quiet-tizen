@@ -54,7 +54,9 @@ class PackageTests(unittest.TestCase):
                 self.assertRegex(profile["firmware"], r"^T-[A-Z0-9]+-[0-9]{4}-[0-9]+\.[0-9]+$")
                 self.assertEqual(path.stem, profile["model"].lower() + "-" + profile["firmware"].rsplit("-", 1)[1])
                 if "launcher" in profile:
-                    self.assertEqual(set(profile["launcher"]), {"app_id", "dll"})
+                    self.assertLessEqual({"app_id", "dll"}, set(profile["launcher"]))
+                    self.assertLessEqual(set(profile["launcher"]), {"app_id", "dll", "settings_route"})
+                    self.assertIn(profile["launcher"].get("settings_route", "launcher"), {"launcher", "quicklaunch"})
                 groups = profile.get("groups", {})
                 for group, entry in groups.items():
                     self.assertRegex(group, r"^[a-z0-9]+(-[a-z0-9]+)*$")

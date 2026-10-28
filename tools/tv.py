@@ -83,7 +83,8 @@ def check_identity(model, firmware):
 def launcher_environment(profile):
     # Recipes read Quiet Home's host container from these instead of positional arguments.
     launcher = profile["launcher"]
-    environment = {"QUIET_LAUNCHER_APP": launcher["app_id"], "QUIET_LAUNCHER_DLL": launcher["dll"]}
+    environment = {"QUIET_LAUNCHER_APP": launcher["app_id"], "QUIET_LAUNCHER_DLL": launcher["dll"],
+                   "QUIET_SETTINGS_ROUTE": launcher.get("settings_route", "launcher")}
     for value in environment.values():
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value):
             raise ValueError(f"Invalid launcher value {value!r} in the profile.")

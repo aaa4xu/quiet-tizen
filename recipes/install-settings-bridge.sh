@@ -4,11 +4,19 @@ set -eu
 test "$(id -u)" = 0
 name=${1:?Snapshot name required}
 case "$name" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
-# Route to the container install-launcher.sh put Quiet Home in; there must be exactly one.
+# The container install-launcher.sh put Quiet Home in; there must be exactly one.
 set -- /opt/usr/apps/*/res/quiet-home
 test $# = 1 && test -d "$1" || { echo 'Expected Quiet Home in exactly one container' >&2; exit 1; }
 container=${1#/opt/usr/apps/}; container=${container%/res/quiet-home}
 case "$container" in ''|.*|*[!A-Za-z0-9_.-]*) exit 1;; esac
+# tv.py passes the profile's launcher.settings_route. "launcher" sends the keys straight to
+# that container. "quicklaunch" sends them to the replaced QuickLaunch, which opens Quiet
+# Home: on the S95F a key launch of the container itself opened nothing.
+case "${QUIET_SETTINGS_ROUTE:-launcher}" in
+    launcher) target=package:$container;;
+    quicklaunch) target=package:com.samsung.tv.quicklaunch;;
+    *) echo "Unknown settings route ${QUIET_SETTINGS_ROUTE:-}" >&2; exit 1;;
+esac
 D=/opt/usr/share/quiet-tizen-backups/$name
 Q=/opt/usr/apps/com.samsung.tv.quicklaunch
 S=/home/owner/share/tmp/sdk_tools/quiet-tizen/unpacked
@@ -23,7 +31,7 @@ test "$(sqlite3 -readonly /opt/dbspace/.pkgmgr_parser.db "SELECT count(*) FROM p
 test "$(sqlite3 -readonly /opt/dbspace/.app-context.db "SELECT count(*) FROM key_filter WHERE appid='com.samsung.tv.quicklaunch' AND key='XF86More' AND IFNULL(on_selector,'')='';")" = 1
 test "$(sqlite3 -readonly /opt/dbspace/.app-context.db "SELECT count(*) FROM key_filter WHERE appid='org.tizen.menu' AND key='XF86SysMenu' AND IFNULL(on_selector,'')='';")" = 1
 cp -a "$Q/bin/QuickLaunch.dll" "$D/QuickLaunch-before.dll"
-printf 'package:%s\n' "$container" > "$D/bridge-target.txt"
+printf '%s\n' "$target" > "$D/bridge-target.txt"
 app_launcher -u 5001 -k com.samsung.tv.quicklaunch || true
 if [ -d "$Q/bin/.native_image" ]; then mv "$Q/bin/.native_image" "$D/quicklaunch-native-image"; fi
 cp "$S/QuickLaunch.dll" "$Q/bin/QuickLaunch.dll"
@@ -38,7 +46,7 @@ CREATE TEMP TABLE guard(ok INTEGER CHECK(ok=1));
 INSERT INTO guard SELECT count(*)=2 FROM key_filter live JOIN before.key_filter old ON live.appid=old.appid AND live.key=old.key AND IFNULL(old.on_selector,'')=''
 WHERE ((live.appid='com.samsung.tv.quicklaunch' AND live.key='XF86More') OR (live.appid='org.tizen.menu' AND live.key='XF86SysMenu')) AND IFNULL(live.on_selector,'')=''
 AND live.target_selector IS old.target_selector AND live.args IS old.args;
-UPDATE key_filter SET target_selector='package:$container',args='quiet_page:settings __K_SPLASH_SCREEN:LA_UI_VR_TRANSPARENT'
+UPDATE key_filter SET target_selector='$target',args='quiet_page:settings __K_SPLASH_SCREEN:LA_UI_VR_TRANSPARENT'
 WHERE ((appid='com.samsung.tv.quicklaunch' AND key='XF86More') OR (appid='org.tizen.menu' AND key='XF86SysMenu')) AND IFNULL(on_selector,'')='';
 DROP TABLE guard;
 COMMIT;

@@ -28,12 +28,11 @@ class RoutingTests(unittest.TestCase):
         self.conn.close()
         self.temp.cleanup()
 
-    def sql(self, recipe):
+    def sql(self, recipe, target="package:com.samsung.tv.adplayer"):
         script = (ROOT / "recipes" / recipe).read_text(encoding="utf-8")
         sql = re.search(r"<<SQL\n(.*?)\nSQL", script, re.S).group(1)
-        container = "com.samsung.tv.adplayer"
-        values = {"$D": str(self.directory), "$container": container, "$target": "package:" + container}
-        return re.sub(r"\$(D|container|target)\b", lambda m: values[m.group(0)], sql)
+        values = {"$D": str(self.directory), "$target": target}
+        return re.sub(r"\$(D|target)\b", lambda m: values[m.group(0)], sql)
 
     def test_round_trip_preserves_new_metadata(self):
         self.conn.executescript(self.sql("install-settings-bridge.sh"))
@@ -58,6 +57,18 @@ class RoutingTests(unittest.TestCase):
                          "'package:com.samsung.tv.adplayer'").fetchone(), (2,))
         self.conn.executescript(self.sql("restore-settings-bridge.sh"))
         self.assertEqual(self.conn.execute(conditional).fetchall(), before)
+
+    def test_quicklaunch_route_round_trip(self):
+        # The quicklaunch route keeps XF86More's target and only changes its arguments.
+        quicklaunch = "package:com.samsung.tv.quicklaunch"
+        rows = "SELECT appid,target_selector,args FROM key_filter WHERE IFNULL(on_selector,'')='' ORDER BY appid"
+        before = self.conn.execute(rows).fetchall()
+        self.conn.executescript(self.sql("install-settings-bridge.sh", quicklaunch))
+        self.conn.execute("DETACH before")
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM key_filter WHERE target_selector=? "
+                         "AND args LIKE 'quiet_page:settings %'", (quicklaunch,)).fetchone(), (2,))
+        self.conn.executescript(self.sql("restore-settings-bridge.sh", quicklaunch))
+        self.assertEqual(self.conn.execute(rows).fetchall(), before)
 
     def test_changed_rule_refuses_apply(self):
         self.conn.execute("UPDATE key_filter SET args='vendor-update' WHERE appid='org.tizen.menu'")
