@@ -239,7 +239,9 @@ point says otherwise.
 
 - **After another app the card's preview is black.** The TV still reports the
   input as active (`IsActive` true) but plays no picture until the input is
-  opened again.
+  opened again. When Quiet Home itself opened the app, it shows the card's
+  icon instead until an input is opened through it; an app opened with the
+  remote's own buttons still leaves a black card.
 - Not checked: an HDMI input without a signal, an input unplugged while
   previewed, a full restart and standby/wake with a preview on, and whether
   the owner's own mute survives Quiet Home (`MuteAudio(0)` probably undoes it).
@@ -262,7 +264,9 @@ The decision is in the core and the TV calls are in the host, as
   than Live TV) is shown wide on the Home page, outside demo mode: focused, or
   the card the Home tab leads to. It hides the preview on every other focus and
   page change, releases the screen before an input or app opens and on `Pause`
-  and `Terminate`, and mutes the input when it comes to the front. After one
+  and `Terminate`, and mutes the input when it comes to the front. After it
+  opened an app from the catalog it asks for no preview until an input is
+  opened through it. After one
   refused call it stops asking until the app restarts. The diagnostics file
   ends with `preview=on|off|unsupported`. `Scenarios/PreviewScenarios` tests
   this with the remote.
@@ -304,7 +308,8 @@ Build against the TV's own assemblies and install the build as usual
 - The internal platform privilege is granted to in-house containers. A
   third-party container may not have it; the preview then stays off.
 - Only the input on screen is previewed; other cards keep their icons.
-- After another app the card stays black until the input is opened again.
+- After an app opened outside Quiet Home the card stays black until the input
+  is opened again; after an app Quiet Home opened, it shows the icon.
 - The TV keeps the plane's size after the app; a crash between showing and
   hiding a preview can leave the picture small until Quiet Home shows and
   hides a preview again.

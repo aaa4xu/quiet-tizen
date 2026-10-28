@@ -51,6 +51,9 @@ public sealed class HomeController
     string themeError = "";
     int lastSource;
     PreviewState preview;
+    // Set after Quiet Home opened an app, which leaves the input's picture black until the
+    // input is opened again; the card then keeps its icon instead of a black preview.
+    bool appOpened;
 
     /// <summary>
     /// Creates the controller and subscribes to the TV's input changes and preview failures.
@@ -432,7 +435,8 @@ public sealed class HomeController
     /// picture is already there, so the TV changes no source, HDR or game mode for it, while
     /// previewing another input switched those modes on every focus move. Live TV gets none
     /// (without an antenna the TV covers the screen with its notice), nor does demo mode,
-    /// nor any card after the TV refused a preview.
+    /// nor any card after the TV refused a preview, nor after Quiet Home opened an app (the
+    /// TV plays no picture then until the input is opened again).
     /// </summary>
     void UpdatePreview()
     {
@@ -442,7 +446,7 @@ public sealed class HomeController
         bool previewable = !demo && builtPage == Page.Home && navigator.Page == Page.Home
             && (navigator.Zone == Zone.FirstRow || navigator.Zone == Zone.Tabs)
             && navigator.Adjusting == Adjustment.None && slot >= 0 && slot < inputSources.Count
-            && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource;
+            && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource && !appOpened;
         if (!previewable)
         {
             HidePreview();
@@ -537,7 +541,8 @@ public sealed class HomeController
                 Rebuild();
                 return;
             case HomeAction.LaunchApp app:
-                Launch(new LaunchRequest(app.AppId));
+                if (Launch(new LaunchRequest(app.AppId)))
+                    appOpened = true;
                 return;
             case HomeAction.OpenSamsungSettings menu:
                 Launch(LaunchRequest.SamsungSettings(menu.MenuItem));
@@ -649,26 +654,28 @@ public sealed class HomeController
             return;
         }
         lastSource = source;
+        appOpened = false;
         Launch(LaunchRequest.TvViewer);
     }
 
     /// <summary>
     /// Opens another app and records the result; failures are shown. The TV gets its picture
     /// back first; the input's sound only when Quiet Home goes to the background, so it does
-    /// not play while the app starts.
+    /// not play while the app starts. Returns whether the TV took the request.
     /// </summary>
-    void Launch(LaunchRequest request)
+    bool Launch(LaunchRequest request)
     {
         ReleaseScreen(false);
         var result = tv.Launcher.Launch(request);
         if (!result.Created)
         {
             ShowError("Could not open the app.");
-            return;
+            return false;
         }
         WriteState(request.Activity(result.Code));
         if (result.Code != 0)
             ShowError("Could not open this screen. Try Advanced settings.");
+        return result.Code == 0;
     }
 
     /// <summary>Shows <paramref name="text"/> as the notice.</summary>

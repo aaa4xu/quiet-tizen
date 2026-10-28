@@ -146,6 +146,28 @@ public sealed class PreviewScenarios : IDisposable
     }
 
     /// <summary>
+    /// After Quiet Home opened an app the card of the input on screen keeps its icon (the TV
+    /// plays no picture then); opening the input brings the preview back.
+    /// </summary>
+    [Fact]
+    public void NoPreviewAfterAnAppUntilTheInputIsOpened()
+    {
+        home.Open();
+        home.Press(RemoteKey.Down, RemoteKey.Select);
+        home.Controller.Pause();
+        home.Controller.Resume();
+        home.Launch();
+        Assert.Equal("Console", home.Focused);
+        Assert.True(((HomePageModel)home.Screen.Content).Inputs[1].Expanded);
+        Assert.Null(home.Tv.Previewing);
+        home.Press(RemoteKey.Select);
+        home.Controller.Pause();
+        home.Controller.Resume();
+        home.Launch();
+        Assert.Equal(14, home.Tv.Previewing);
+    }
+
+    /// <summary>
     /// Arriving at Home through the tabs, the card of the input on screen is wide with its
     /// preview while the focus is on the tab, and Down focuses that card.
     /// </summary>

@@ -80,8 +80,9 @@ pipeline and with it HDR and Game Mode on every focus move; Live TV keeps its
 icon. While Quiet Home is in front it mutes the input's sound, as Samsung's
 home does, and turns it back on when an input opens or Quiet Home goes to the
 background. Before an input or app opens the TV's full-screen picture is put
-back first. After another app the card stays black until the input is opened
-again. If the TV refuses the preview (for example without the internal
+back first. After an app the TV plays no picture until the input is opened
+again: when Quiet Home opened the app the card shows its icon, after an app
+opened with the remote's own buttons it stays black. If the TV refuses the preview (for example without the internal
 platform privilege, or on a TV without those assemblies), the cards keep their
 icons until Quiet Home restarts and the diagnostics file says
 `preview=unsupported`. All of this was tested on the QE65S95F
