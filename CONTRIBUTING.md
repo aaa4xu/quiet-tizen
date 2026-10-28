@@ -22,7 +22,7 @@ For local checks:
 ```sh
 python3 -m unittest discover -s tests -v
 python3 tools/build.py payloads
-dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
+dotnet test tests/QuietHome.Core.Tests
 ```
 
 NUI changes also need a build against matching private references and a

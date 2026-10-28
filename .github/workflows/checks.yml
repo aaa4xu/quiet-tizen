@@ -26,5 +26,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Build open-source access payloads
         run: python tools/build.py payloads
-      - name: Test native catalog logic without Samsung references
-        run: dotnet run --project tests/CatalogTests.csproj -- launcher/assets/apps.json
+      - name: Test Quiet Home logic without Samsung references
+        run: dotnet test tests/QuietHome.Core.Tests

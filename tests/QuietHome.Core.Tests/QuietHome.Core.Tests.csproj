@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests of Quiet Home's platform-free logic; they run on any computer with the .NET 6 SDK.
+       NuGet packages are fine here: nothing from this project goes to the TV. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.6" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../launcher/core/QuietHome.Core.csproj" />
+  </ItemGroup>
+</Project>
