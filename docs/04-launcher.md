@@ -161,6 +161,20 @@ Verify visibly:
 The `build_ms` value in `/tmp/quiet-home-state.txt` measures scene construction,
 not input-to-photon latency or complete rendering time.
 
+To see what the TV draws without a camera, Probe can capture the UI layer
+with `efl_util_screenshot` and write it as a PNG small enough for `tv pull`:
+
+```sh
+tv push .local/build/Probe/Probe.dll Probe.dll
+tv exec --command '/usr/bin/dotnet /home/owner/share/tmp/sdk_tools/quiet-tizen/Probe.dll screenshot /tmp/quiet-home.png'
+tv pull /tmp/quiet-home.png .local/screens/home.png
+```
+
+An optional width and height follow the path (default 1920 1080). Only the
+UI is captured: an HDMI or TV picture comes out black, and so does the whole
+frame while the screen is off. Keep the images in `.local/`; they can show
+account names, app lists and other personal details.
+
 ## Make it open on Home and startup
 
 Save the **three original values** privately first: the main-operation Home
