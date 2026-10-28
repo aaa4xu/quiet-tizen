@@ -200,7 +200,7 @@ launcher first. Name the snapshot Quiet Home was installed from and give each
 update its own name:
 
 ```sh
-tar -czf .local/package.tar.gz -C .local/package .
+COPYFILE_DISABLE=1 tar -czf .local/package.tar.gz -C .local/package .
 tv push .local/package.tar.gz package.tar.gz
 tv exec --script recipes/update-launcher.sh --arg apply --arg home-01 --arg visual-01
 tv exec --script recipes/update-launcher.sh --arg rollback --arg home-01 --arg visual-01
@@ -215,7 +215,35 @@ and relaunches the container. Home and startup selectors are unchanged.
 
 `rollback` returns the build the update replaced, newest update first.
 `restore-launcher.sh` still restores Samsung's original container from the
-same snapshot after any number of updates.
+same snapshot after any number of updates. `COPYFILE_DISABLE=1` keeps macOS
+tar from adding `._` metadata files to the package.
+
+Every update keeps a full copy of the build it replaced. To free that space,
+remove old updates right after a successful `apply`:
+
+```sh
+tv exec --script recipes/update-launcher.sh --arg prune --arg home-01 --arg 3
+```
+
+`prune` keeps the installed update and the two below it, and removes every
+other update of the snapshot, rolled-back ones included. It never touches
+the installed build or Samsung's container in the snapshot. Rollback then
+goes back as far as the oldest kept update; `restore-launcher.sh` works as
+before.
+
+For a development loop, `tools/update.py` does all of this in one run: it
+builds the launcher for the profile, packs and uploads it, applies it as
+`dev-YYYYMMDD-HHMMSS`, optionally prunes (`--keep N`) and takes the demo
+frames with `tools/screens.py` into `.local/baseline/<name>`, comparing them
+with `--compare DIR` when given. The name, snapshot and DLL digest are
+appended to `.local/updates.log` for a later rollback. Like `screens.py`, it
+restarts Quiet Home and shows demo pages over the picture:
+
+```sh
+python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
+  --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01 \
+  --keep 3 --compare .local/baseline/BUILD
+```
 
 ## Make it open on Home and startup
 

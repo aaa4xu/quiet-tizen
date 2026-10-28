@@ -84,6 +84,9 @@ again. Each install needs its own snapshot.
 
 To undo only a later Quiet Home build, roll that update back instead:
 `recipes/update-launcher.sh` with `rollback`, the snapshot and the update name.
+After `prune`, rollback goes back only as far as the oldest kept update; the
+removed ones are gone. Restoring Samsung's container with
+`restore-launcher.sh` does not depend on `updates/` and works after any prune.
 
 Allow temporary root cleanup to finish, then restart and test picture,
 sound, HDMI, Home, settings and remote. Restore only the optional cleanup

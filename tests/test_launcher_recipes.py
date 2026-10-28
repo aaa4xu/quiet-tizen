@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 import hashlib
 import os
 import re
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -11,6 +13,9 @@ from contextlib import closing
 from tv_side import runs_on_tv
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from update import log_line, pack, update_name
+
 CONTAINER = "example.quiet-home-host"
 
 
@@ -192,16 +197,25 @@ class UpdateTests(unittest.TestCase):
                                    env=self.environment)
         return self.last.returncode == 0
 
-    def stage_build(self, build):
+    def stage_build(self, build, dll=None):
         source = Path(self.temp.name) / build
         (source / "quiet-home").mkdir(parents=True)
-        (source / "Host.dll").write_text(build)
+        (source / "Host.dll").write_text(dll or build)
         (source / "quiet-home/apps.json").write_text(f"catalog-{build}")
-        with tarfile.open(self.stage / "package.tar.gz", "w:gz") as package:
-            package.add(source, arcname=".")
+        pack(source, self.stage / "package.tar.gz")
 
     def installed(self):
         return self.dll.read_text(), (self.app / "res/quiet-home/apps.json").read_text()
+
+    def apply(self, *builds):
+        for build in builds:
+            self.stage_build(build)
+            self.assertTrue(self.run_recipe("apply", "home-01", build), self.last.stderr)
+
+    def snapshot_files(self):
+        # Everything restore-launcher.sh relies on lies outside updates/.
+        return {path.relative_to(self.backup): path.read_bytes() for path in self.backup.rglob("*")
+                if path.is_file() and "updates" not in path.relative_to(self.backup).parts}
 
     @runs_on_tv
     def test_updates_roll_back_newest_first_to_the_installed_build(self):
@@ -230,6 +244,74 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("not the Quiet Home build", self.last.stderr)
         self.assertFalse((self.backup / "updates").exists())
         self.assertEqual((self.app / "res/quiet-home/apps.json").read_text(), "catalog-1")
+
+    @runs_on_tv
+    def test_an_update_with_the_same_dll_is_rolled_back_only_from_the_top(self):
+        self.apply("build-2")
+        self.stage_build("build-2b", dll="build-2")  # only the catalog changed
+        self.assertTrue(self.run_recipe("apply", "home-01", "build-2b"), self.last.stderr)
+        self.assertFalse(self.run_recipe("rollback", "home-01", "build-2"))
+        self.assertTrue(self.run_recipe("rollback", "home-01", "build-2b"), self.last.stderr)
+        self.assertEqual(self.installed(), ("build-2", "catalog-build-2"))
+        self.assertTrue(self.run_recipe("rollback", "home-01", "build-2"), self.last.stderr)
+        self.assertEqual(self.installed(), ("build-1", "catalog-1"))
+        self.assertEqual((self.backup / "installed-update").exists(), False)
+
+    @runs_on_tv
+    def test_prune_keeps_the_newest_updates_on_the_chain(self):
+        self.assertFalse(self.run_recipe("prune", "home-01", "2"))  # only right after an apply
+        self.apply("u2", "u3")
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u3"), self.last.stderr)
+        self.apply("u4", "u5")
+        before = self.snapshot_files()
+        self.assertFalse(self.run_recipe("prune", "home-01", "0"))
+        self.assertTrue(self.run_recipe("prune", "home-01", "2"), self.last.stderr)
+        self.assertEqual(sorted(path.name for path in (self.backup / "updates").iterdir()), ["u4", "u5"])
+        self.assertEqual(self.snapshot_files(), before)
+        self.assertEqual(self.installed(), ("u5", "catalog-u5"))
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u5"), self.last.stderr)
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u4"), self.last.stderr)
+        self.assertEqual(self.installed(), ("u2", "catalog-u2"))  # the oldest kept update's own backup
+        self.assertFalse(self.run_recipe("rollback", "home-01", "u2"))
+        self.assertIn("No update u2", self.last.stderr)
+
+    @runs_on_tv
+    def test_prune_follows_older_updates_by_digest(self):
+        self.apply("u2", "u3")
+        for path in [self.backup / "installed-update", *(self.backup / "updates").glob("*/previous-update")]:
+            path.unlink()  # as left by update-launcher.sh before these records
+        self.apply("u4")
+        self.assertTrue(self.run_recipe("prune", "home-01", "2"), self.last.stderr)
+        self.assertEqual(sorted(path.name for path in (self.backup / "updates").iterdir()), ["u3", "u4"])
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u4"), self.last.stderr)
+        self.assertTrue(self.run_recipe("rollback", "home-01", "u3"), self.last.stderr)
+        self.assertEqual(self.installed(), ("u2", "catalog-u2"))
+
+
+class UpdateToolTests(unittest.TestCase):
+    """The parts of tools/update.py that run on the computer."""
+
+    def test_names_suit_update_launcher_and_sort_by_time(self):
+        early, late = (update_name(datetime(2026, 10, 28, hour, 5, 9)) for hour in (9, 17))
+        self.assertEqual(early, "dev-20261028-090509")
+        self.assertRegex(late, r"^[A-Za-z0-9_-]+$")
+        self.assertLess(early, late)
+
+    def test_package_is_owned_by_root_and_rooted_at_dot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "package"
+            (source / "quiet-home").mkdir(parents=True)
+            (source / "Host.dll").write_text("build")
+            (source / "quiet-home/apps.json").write_text("[]")
+            pack(source, Path(temp) / "package.tar.gz")
+            with tarfile.open(Path(temp) / "package.tar.gz") as package:
+                members = package.getmembers()
+        self.assertEqual(sorted(m.name for m in members), [".", "./Host.dll", "./quiet-home", "./quiet-home/apps.json"])
+        self.assertEqual({(m.uid, m.gid, m.uname, m.gname) for m in members}, {(0, 0, "", "")})
+
+    def test_log_line(self):
+        line = log_line(datetime(2026, 10, 28, 9, 5, 9, tzinfo=timezone.utc), "home-01", "dev-1", "abc", "applied")
+        self.assertEqual(line, "2026-10-28T09:05:09+00:00\thome-01\tdev-1\tabc\tapplied\n")
 
 
 if __name__ == "__main__":
