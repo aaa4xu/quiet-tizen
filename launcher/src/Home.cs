@@ -31,17 +31,17 @@ public sealed class QuietHome : NUIApplication
  int page, selected, area=1, lastSource=14;
  string editing="";
  long buildMilliseconds;
- int currentVolume, currentMute;
+ int currentVolume;
+ bool dark=true;
+ string themeError="";
  readonly Dictionary<string,string> settingValues=new Dictionary<string,string>();
  readonly Dictionary<string,string> settingNames=new Dictionary<string,string>();
  readonly Dictionary<string,bool> settingEnabled=new Dictionary<string,bool>();
  double brightnessMin,brightnessMax=50,brightnessStep=1;
  string lastKey="";
  long lastKeyAt;
- readonly Color ink=new Color(0.114f,0.114f,0.122f,1);
- readonly Color muted=new Color(0.431f,0.431f,0.451f,1);
+ Color ink,muted,accent,tabFocus;
  readonly Color white=new Color(1,1,1,1);
- readonly Color accent=new Color(0.24f,0.29f,0.72f,1);
  [DllImport("libsource-api.so")] static extern int connect_source(int sourceType);
  [DllImport("libvconf.so.0")] static extern int vconf_get_int(string key,out int value);
  [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_create(out IntPtr app);
@@ -52,8 +52,6 @@ public sealed class QuietHome : NUIApplication
  [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_destroy(IntPtr app);
  [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_get_master_volume(out int value);
  [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_set_master_volume(int value);
- [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_get_master_mute(out int value);
- [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_set_master_mute(int value);
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemValue(string id,out string name,out string value);
  [DllImport("libsettings-api.so")] static extern bool CSharpSetItemValue(string id,string value);
  [DllImport("libsettings-api.so")] static extern bool CSharpGetItemEnable(string id,out bool enabled);
@@ -66,7 +64,7 @@ public sealed class QuietHome : NUIApplication
   base.OnCreate();
   try{fontLoaded=FontClient.Instance.AddCustomFontDirectory(Root+"fonts");}catch{fontLoaded=false;}
   try{library=AppLibrary.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
-  Window.Default.BackgroundColor=new Color(0.96f,0.96f,0.97f,1);
+  LoadTheme();
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   PreloadArtwork();
   RefreshSource();selected=SourceIndex();BuildPage();
@@ -80,6 +78,24 @@ public sealed class QuietHome : NUIApplication
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;editing="";BuildPage();WriteState(activity);}
  void RefreshSource(){try{int n;if(vconf_get_int("memory/system/source_type",out n)==0&&n>=13&&n<=15)lastSource=n;}catch{}}
  int SourceIndex(){return lastSource==15?1:lastSource==13?2:0;}
+ // Dark is the default; the choice is kept in the container's own data directory.
+ string ThemeFile(){return System.IO.Path.Combine(this.DirectoryInfo.Data,"theme");}
+ void LoadTheme(){try{dark=File.ReadAllText(ThemeFile()).Trim()!="light";}catch{dark=true;}ApplyTheme();}
+ void ApplyTheme()
+ {
+  if(dark){ink=new Color(0.95f,0.96f,0.98f,1);muted=new Color(0.62f,0.65f,0.72f,1);accent=new Color(0.49f,0.62f,1,1);tabFocus=new Color(1,1,1,.14f);}
+  else{ink=new Color(0.114f,0.114f,0.122f,1);muted=new Color(0.431f,0.431f,0.451f,1);accent=new Color(0.24f,0.29f,0.72f,1);tabFocus=new Color(1,1,1,.7f);}
+  Window.Default.BackgroundColor=dark?new Color(0.05f,0.06f,0.08f,1):new Color(0.96f,0.96f,0.97f,1);
+ }
+ void ToggleTheme()
+ {
+  dark=!dark;themeError="";
+  try{File.WriteAllText(ThemeFile(),dark?"dark":"light");}catch(Exception ex){themeError=ex.Message;}
+  ApplyTheme();BuildPage();
+  if(themeError!="")ShowError("Theme changed for now; it could not be saved.");
+  WriteState("theme_changed");
+ }
+ string Themed(string asset){return dark?"dark-"+asset:asset;}
  View Add(View v){scene.Add(v);Window.Default.Add(v);return v;}
  View Panel(int x,int y,int w,int h,Color color,int radius=18){return Add(new View{Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),BackgroundColor=color,CornerRadius=new Vector4(radius,radius,radius,radius)});}
  TextLabel Text(string text,int x,int y,int w,int h,float size,Color color,string face="Medium")
@@ -92,7 +108,7 @@ public sealed class QuietHome : NUIApplication
   if(focusAnimation!=null){focusAnimation.Stop();focusAnimation.Dispose();focusAnimation=null;}
   ParkArtwork();pageArtworkCold=0;
   foreach(var v in scene){Window.Default.Remove(v);v.Dispose();}scene.Clear();slots.Clear();
-  Add(new ImageView{ResourceUrl=Root+"free-background.svg",Size2D=new Size2D(1920,1080)});
+  Add(new ImageView{ResourceUrl=Root+Themed("free-background.svg"),Size2D=new Size2D(1920,1080)});
   Text(page==0?"Home":page==1?"Your Apps":"Quick Settings",76,55,1350,100,76,ink,"Display");
   tabs=new TextLabel[3];string[] nav={"Inputs","Apps","Settings"};int[] tx={54,221,366};int[] tw={153,131,182};
   for(int i=0;i<3;i++){tabs[i]=Text(nav[i],tx[i],158,tw[i],68,30,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;}
@@ -112,13 +128,13 @@ public sealed class QuietHome : NUIApplication
    SettingsTile("Brightness","brightness","Select · Left / Right to adjust","brightness",1,0);
    SettingsTile("Game Mode","game-mode","Select to switch on or off","game",2,0);
    SettingsTile("Sleep Timer","sleeptimer","Select to change the timer","sleep",3,0);
-   SettingsTile("Sound","mute","Select to mute or unmute","mute",0,1);
+   SettingsTile("Theme","theme","Select to switch dark or light","theme",0,1);
    SettingsTile("Controllers","controllers","DualSense · hold PS + Create","controller",1,1);
    SettingsTile("Network","network","Wi-Fi and connection setup","network",2,1);
    SettingsTile("Advanced","app:org.tizen.menu","Open Samsung's full settings","settings",3,1);
   }
   if(page==0){
-  Add(new ImageView{ResourceUrl=Root+"glass-shelf.svg",Position2D=new Position2D(0,784),Size2D=new Size2D(1920,280)});
+  Add(new ImageView{ResourceUrl=Root+Themed("glass-shelf.svg"),Position2D=new Position2D(0,784),Size2D=new Size2D(1920,280)});
   Dock("Netflix","app:org.tizen.netflix-app","netflix",0);
   Dock("YouTube","app:com.samsung.tv.cobalt-yt","youtube",1);
   Dock("Prime Video","app:org.tizen.primevideo","prime",2);
@@ -143,7 +159,8 @@ public sealed class QuietHome : NUIApplication
   {
    var app=library[start+i];int x=80+(i%5)*358,y=266+(i/5)*245,w=328,h=184;
    var shadow=Panel(x-5,y+7,w+10,h+8,new Color(.12f,.15f,.25f,.08f),22);
-   var card=Panel(x+w/2,y+h/2,w,h,HexColor(app.Background),18);
+   // The utility card has no artwork; its cross is drawn in ink, so it follows the theme.
+   var card=Panel(x+w/2,y+h/2,w,h,app.Utility&&dark?new Color(.16f,.18f,.24f,1):HexColor(app.Background),18);
    card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
    AddAppArtwork(card,app,w,h);
    var ring=new View{Size2D=new Size2D(w,h),BackgroundColor=new Color(0,0,0,0),CornerRadius=new Vector4(18,18,18,18),BorderlineWidth=4,BorderlineColor=accent,Opacity=0};
@@ -258,7 +275,7 @@ public sealed class QuietHome : NUIApplication
  {
   int x=1596+n*88;
   var card=Panel(x+34,103,68,68,new Color(0,0,0,0),34);card.PivotPoint=new Position(.5f,.5f,.5f);card.PositionUsesPivotPoint=true;
-  card.Add(new ImageView{ResourceUrl=Root+"glass-button.svg",Position2D=new Position2D(-16,-16),Size2D=new Size2D(100,112)});
+  card.Add(new ImageView{ResourceUrl=Root+Themed("glass-button.svg"),Position2D=new Position2D(-16,-16),Size2D=new Size2D(100,112)});
   card.Add(new ImageView{ResourceUrl=Root+"symbol-"+icon+".png",Color=ink,Position2D=new Position2D(19,19),Size2D=new Size2D(30,30)});
   slots.Add(new Slot{Card=card,Name=label,Action=action,Description=label,Row=-1,X=x,Y=69,W=68,H=68});
  }
@@ -267,7 +284,7 @@ public sealed class QuietHome : NUIApplication
  {
   if(focusAnimation!=null){focusAnimation.Stop();focusAnimation.Dispose();focusAnimation=null;}
   if(animate)focusAnimation=new Animation(180);
-  for(int i=0;i<3;i++){tabs[i].TextColor=i==page?ink:muted;tabs[i].FontFamily="Quiet Inter "+(i==page?"Semibold":"Medium");tabs[i].BackgroundColor=area==0&&i==page?new Color(1,1,1,.7f):new Color(0,0,0,0);tabs[i].CornerRadius=new Vector4(34,34,34,34);}
+  for(int i=0;i<3;i++){tabs[i].TextColor=i==page?ink:muted;tabs[i].FontFamily="Quiet Inter "+(i==page?"Semibold":"Medium");tabs[i].BackgroundColor=area==0&&i==page?tabFocus:new Color(0,0,0,0);tabs[i].CornerRadius=new Vector4(34,34,34,34);}
   for(int i=0;i<slots.Count;i++){
    var s=slots[i];bool f=area!=0&&selected==i;
    float scale=f?(page==1&&s.Row>=0?1.055f:page==2&&s.Row>=0?1.035f:s.Row==0?1.05f:s.Row==1?1.20f:1.10f):1;
@@ -288,7 +305,7 @@ public sealed class QuietHome : NUIApplication
    slots[1].Label.Text=SettingName("brightness");
    slots[2].Label.Text=SettingName("game-mode");
    slots[3].Label.Text=SettingName("sleeptimer");
-   slots[4].Label.Text=currentMute<0?"Unavailable":currentMute==1?"Muted":"Sound on";
+   slots[4].Label.Text=dark?"Dark":"Light";
    slots[5].Label.Text="Pair controller";
    slots[6].Label.Text="Connections";
    slots[7].Label.Text="More settings";
@@ -344,11 +361,10 @@ public sealed class QuietHome : NUIApplication
   if(a=="volume"||a=="brightness"){RefreshSettings();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a=="sleeptimer"){RefreshSettings();int n;if(int.TryParse(SettingValue(a),out n))SetSetting(a,((n+1)%5).ToString());return;}
-  if(a=="mute"){int n;int r=sound_manager_get_master_mute(out n);if(r==0)r=sound_manager_set_master_mute(n==1?0:1);if(r!=0)ShowError("Use the remote's mute button.");RefreshSettings();UpdateFocus();WriteState("mute_changed");}
+  if(a=="theme"){ToggleTheme();return;}
  }
  void RefreshSettings(){
   currentVolume=sound_manager_get_master_volume(out var v)==0?v:-1;
-  currentMute=sound_manager_get_master_mute(out var m)==0?m:-1;
   foreach(var id in new[]{"brightness","game-mode","sleeptimer"}){
    try{if(CSharpGetItemValue(id,out var name,out var value)&&!string.IsNullOrEmpty(value)){settingValues[id]=value;settingNames[id]=name;}else{settingValues.Remove(id);settingNames.Remove(id);}
     settingEnabled[id]=CSharpGetItemEnable(id,out var enabled)&&enabled;
@@ -385,6 +401,6 @@ public sealed class QuietHome : NUIApplication
    if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
  }
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nmute="+currentMute+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
+ void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+lastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+editing+"\nvolume="+currentVolume+"\nbrightness="+SettingValue("brightness")+"\ngame-mode="+SettingValue("game-mode")+"\nsleeptimer="+SettingValue("sleeptimer")+"\n");}catch{}}
  public static void Main(string[] args){using(var app=new QuietHome())app.Run(args);}
 }

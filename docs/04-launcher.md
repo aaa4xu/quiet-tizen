@@ -180,8 +180,10 @@ were changed together, so which one mattered is unknown.
 
 ## Replace the slow settings/sidebar path
 
-The quick settings page handles volume, mute, brightness, Game Mode and
-sleep timer with native APIs. Availability is checked for the current input.
+The quick settings page handles volume, brightness, Game Mode and sleep
+timer with native APIs. Availability is checked for the current input. Its
+Theme card switches between the default dark theme and the light one; the
+choice is saved in the container's data directory. Mute stays on the remote.
 Advanced settings, network setup and Bluetooth pairing still use Samsung's
 native menu on demand.
 
