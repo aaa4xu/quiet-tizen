@@ -23,6 +23,8 @@
             pkgs.openssl
             # Inspecting registry snapshots pulled into .local/.
             pkgs.sqlite
+            # Decompiling Samsung's native libraries (.local/platform-api-reference/native/).
+            pkgs.ghidra
           ];
           DOTNET_CLI_TELEMETRY_OPTOUT = "1";
           # Samsung's SDB is not in nixpkgs; use the copy kept under .local/ when present.
