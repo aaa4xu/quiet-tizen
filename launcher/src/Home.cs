@@ -73,12 +73,14 @@ public sealed class QuietHome : NUIApplication
   try{library=AppLibrary.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
   LoadTheme();
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
+  // Samsung Home's source editor opens over this window without pausing it; reread the inputs on return.
+  Window.Default.FocusChanged+=(s,e)=>{if(e.FocusGained){RefreshInputCards();WriteState("focus_gained");}};
   PreloadArtwork();
   RefreshSource();selected=SourceIndex();BuildPage();
   clockTimer=new Tizen.NUI.Timer(30000);
   clockTimer.Tick+=(s,e)=>{if(clock!=null)clock.Text=DateTime.Now.ToString("h:mm tt");return true;};clockTimer.Start();WriteState("created");
  }
- protected override void OnResume(){base.OnResume();clockTimer?.Start();RefreshSource();if(tabs!=null&&page==2){RefreshSettings();UpdateFocus(false);}WriteState("resumed");}
+ protected override void OnResume(){base.OnResume();clockTimer?.Start();RefreshSource();RefreshInputCards();if(tabs!=null&&page==2){RefreshSettings();UpdateFocus(false);}WriteState("resumed");}
  protected override void OnAppControlReceived(AppControlReceivedEventArgs e){base.OnAppControlReceived(e);string requested; if(e.ReceivedAppControl.ExtraData.TryGet("quiet_page",out requested)&&requested=="settings")OpenSettings("settings_request");else if(requested=="apps"){page=1;area=1;selected=0;BuildPage();}else Home("home_request");}
  protected override void OnPause(){base.OnPause();editing="";clockTimer?.Stop();WriteState("paused");}
  void Home(string activity){clockTimer?.Start();RefreshSource();bool inputsChanged=RefreshInputSources();if(tabs!=null){bool unchanged=!inputsChanged&&page==0&&area==1&&editing==""&&selected==SourceIndex();page=0;area=1;editing="";selected=SourceIndex();if(!unchanged)BuildPage();WriteState(activity);}}
@@ -156,6 +158,8 @@ public sealed class QuietHome : NUIApplication
   Dock("Prime Video","app:org.tizen.primevideo","prime",2);
   Dock("Your Apps","page:1","apps",3);
   }
+  // Samsung Home's source list edits an input's name and type (hold Select on it).
+  if(page==0)Toolbar("Edit inputs","edit-inputs","tv_settings",-1);
   Toolbar("Apps","page:1","apps",0);Toolbar("Inputs","page:0","hdmi",1);Toolbar("Settings","page:2","settings",2);
   toolbarHint=Text("",1530,170,310,45,24,ink);toolbarHint.HorizontalAlignment=HorizontalAlignment.End;
   detail=Text("",80,1030,1320,35,20,muted);
@@ -166,6 +170,7 @@ public sealed class QuietHome : NUIApplication
   UpdateFocus(false);
   buildMilliseconds=stopwatch.ElapsedMilliseconds;WriteState("page_ready");
  }
+ void RefreshInputCards(){if(tabs!=null&&page==0&&editing==""&&RefreshInputSources())BuildPage();}
  void BuildInputs()
  {
   if(inputSources.Count==0){Text("No connected inputs found.",80,420,1500,70,34,ink,"Semibold");return;}
@@ -350,11 +355,11 @@ public sealed class QuietHome : NUIApplication
    if(k=="XF86SysMenu"||k=="XF86More"){OpenSettings("settings_key");return;}
    if(page==1&&HandleLibraryKey(k))return;
    if(editing!=""){if(k=="Left"||k=="Right"){int d=k=="Left"?-1:1;if(editing=="volume")ChangeVolume(d);else ChangeBrightness(d);}else if(k=="Return"||k=="KP_Enter"||k=="XF86Back"||k=="Back"||k=="Escape"){editing="";UpdateFocus();}return;}
-   if(k=="Up"){if(area==2&&Row(0).Count==0)area=0;else if(area==2){int col=Row(1).IndexOf(selected);area=1;selected=Row(0)[page==2?col:0];}else if(area==1)area=0;UpdateFocus();}
+   if(k=="Up"){if(area==2&&Row(0).Count==0)area=0;else if(area==2){int col=Row(1).IndexOf(selected);area=1;selected=Row(0)[page==2?col:0];}else if(area==1)area=0;else if(area==0){area=3;selected=Row(-1)[0];}UpdateFocus();}
    else if(k=="Down"){if((area==0||area==3)&&Row(0).Count==0){area=2;selected=Row(1)[0];}else if(area==0||area==3){area=1;selected=Row(0)[0];}else if(area==1){int col=Row(0).IndexOf(selected);area=2;selected=Row(1)[page==2?col:0];}UpdateFocus();}
    else if(k=="Left"||k=="Right"){
     int d=k=="Left"?-1:1;
-    if(area==0){int next=page+d;if(next<0||next>2){area=3;selected=Row(-1)[next<0?2:0];UpdateFocus();}else{page=next;selected=0;BuildPage();}}
+    if(area==0){int next=page+d;if(next<0||next>2){area=3;var r=Row(-1);selected=r[next<0?r.Count-1:0];UpdateFocus();}else{page=next;selected=0;BuildPage();}}
     else if(area==3){var r=Row(-1);int n=r.IndexOf(selected)+d;if(n<0||n>=r.Count){area=0;page=n<0?2:0;selected=0;BuildPage();}else{selected=r[n];UpdateFocus();}}
     else{var r=Row(area-1);int n=r.IndexOf(selected);selected=r[(n+d+r.Count)%r.Count];UpdateFocus();}
    }
@@ -385,6 +390,7 @@ public sealed class QuietHome : NUIApplication
   if(a.StartsWith("app:")){Launch(a.Substring(4));return;}
   if(a=="controllers"){Launch("org.tizen.menu","add-bluetooth-keyboard");return;}
   if(a=="network"){Launch("org.tizen.menu","networksettings");return;}
+  if(a=="edit-inputs"){Launch("com.samsung.tv.csfs");return;}
   if(a=="volume"||a=="brightness"){RefreshSettings();if(a=="brightness"&&!CanEdit(a)){ShowError("Brightness is unavailable for the current input.");return;}editing=a;UpdateFocus();return;}
   if(a=="game-mode"){RefreshSettings();SetSetting(a,SettingValue(a)=="1"?"0":"1");return;}
   if(a=="sleeptimer"){RefreshSettings();int n;if(int.TryParse(SettingValue(a),out n))SetSetting(a,((n+1)%5).ToString());return;}
@@ -425,6 +431,8 @@ public sealed class QuietHome : NUIApplication
     if(r==0)r=app_control_add_extra_data(c,"__K_EX_FORCE_BOOST","enable");
     if(r==0)r=app_control_add_extra_data(c,"__K_SPLASH_SCREEN","LA_UI_VR_TRANSPARENT");
    }
+   // The Source key's entry point opens Samsung Home on its source list.
+   if(r==0&&id=="com.samsung.tv.csfs")r=app_control_add_extra_data(c,"entry_point","source_key");
    if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
  }
  void ShowError(string text){notice.Text=text;}

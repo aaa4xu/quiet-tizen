@@ -97,6 +97,7 @@ root access; it does not validate those scripts there.
 8. [Understand privacy findings](docs/08-privacy.md).
 9. [Restore the original experience](docs/09-recovery.md).
 10. [Remote app buttons on other models (findings only)](docs/10-remote-buttons.md).
+11. [Samsung's source-list API (findings)](docs/11-source-api.md).
 
 Read [AGENTS.md](AGENTS.md) before using the tools. TV commands require a
 specific address; they read the model and firmware from the TV and check them.

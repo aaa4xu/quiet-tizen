@@ -57,7 +57,9 @@ The name and icon come from the TV; a name set in Samsung's source list wins,
 and an unnamed input shows the HDMI number from its icon. This is a private
 platform interface: its availability, fields and memory ownership may differ
 by model and firmware. If the call fails, the page says no inputs were found;
-select an input from the native menu.
+select an input from the native menu. The **Edit inputs** button at the top
+right of the Home page opens Samsung Home's source list, where holding Select
+on an input edits its name and device type. See [the source-list API findings](11-source-api.md).
 
 On the QE65S95F (`T-RSMFDEUC-0090-1301.0`) the call returned a JSON array
 allocated with `malloc`: Live TV (`sourceType` 0), a PlayStation 5 (14) and an
