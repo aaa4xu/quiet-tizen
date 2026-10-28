@@ -5,7 +5,7 @@
  </PropertyGroup>
  <Import Project="../core/CoreCompile.props" />
  <!-- The core's sources go into this one assembly; its own build output must not. -->
- <ItemGroup><Compile Include="Home.cs" /><Compile Include="../core/**/*.cs" Exclude="../core/obj/**;../core/bin/**" /></ItemGroup>
+ <ItemGroup><Compile Include="Home.cs" /><Compile Include="Interop/**/*.cs" /><Compile Include="Platform/**/*.cs" /><Compile Include="../core/**/*.cs" Exclude="../core/obj/**;../core/bin/**" /></ItemGroup>
  <Import Project="QuietHomeContainer.targets" />
  <ItemGroup>
   <Reference Include="Tizen.NUI"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.NUI.dll</HintPath><Private>false</Private></Reference>

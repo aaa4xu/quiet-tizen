@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using QuietHome.Core.Actions;
 using QuietHome.Core.Navigation;
+using QuietHome.Core.Platform;
 using QuietHome.Core.Settings;
 using Xunit;
 
@@ -33,20 +36,10 @@ public class SettingsTests
     {
         var state = new QuickSettingsState { Volume = 17 };
         state.Record("game-mode", "On", "1");
-        string?[] values = SettingsTile.All.Select(t => t.ValueText(state, dark: false, demo: false)).ToArray();
+        string?[] values = SettingsTile.All.Select(t => t.ValueText(state, dark: false)).ToArray();
         Assert.Equal(new[] { "17", "Unavailable", "On", "Unavailable", "Light", "Pair controller", "Connections", "More settings" }, values);
         state.Volume = -1;
-        Assert.Equal("Unavailable", SettingsTile.All[0].ValueText(state, dark: true, demo: false));
-    }
-
-    /// <summary>Demo mode shows fixed sample values whatever the TV reports.</summary>
-    [Fact]
-    public void DemoValues()
-    {
-        var state = new QuickSettingsState { Volume = 3 };
-        state.Record("brightness", "12", "12");
-        string?[] values = SettingsTile.All.Take(5).Select(t => t.ValueText(state, dark: true, demo: true)).ToArray();
-        Assert.Equal(new[] { "20", "45", "Off", "Off", "Dark" }, values);
+        Assert.Equal("Unavailable", SettingsTile.All[0].ValueText(state, dark: true));
     }
 
     /// <summary>A setting can be changed only when the TV reported a value and allows changes.</summary>
@@ -105,11 +98,11 @@ public class SettingsTests
         var tile = SettingsTile.All[2];
         state.Record("game-mode", "On", "1");
         Assert.Equal("game-mode", state.GameModeId);
-        Assert.Equal("On", tile.ValueText(state, dark: true, demo: false));
+        Assert.Equal("On", tile.ValueText(state, dark: true));
         state.Record("game-mode", "----", "");
         state.Record("game-mode-setting-game-mode-auto", "Auto", "2");
         Assert.Equal("game-mode-setting-game-mode-auto", state.GameModeId);
-        Assert.Equal("Auto", tile.ValueText(state, dark: true, demo: false));
+        Assert.Equal("Auto", tile.ValueText(state, dark: true));
     }
 
     /// <summary>Select steps game mode Auto → On → Off → Auto; an unknown value changes nothing.</summary>
@@ -148,5 +141,75 @@ public class SettingsTests
         var state = new QuickSettingsState();
         state.Record("sleeptimer", "x", current);
         Assert.Equal(expected, state.NextCycleValue("sleeptimer"));
+    }
+
+    /// <summary>
+    /// Refresh reads the volume, every menu item and the brightness range from the TV: an
+    /// unreported volume is -1, a missing value is forgotten and an item whose reading
+    /// throws is not changeable.
+    /// </summary>
+    [Fact]
+    public void RefreshReadsTheTv()
+    {
+        var tv = new FakeSettings();
+        tv.Items["brightness"] = new SettingReading("30", "30", true);
+        tv.Items["sleeptimer"] = new SettingReading("Off", "0", false);
+        tv.Items["game-mode"] = new SettingReading("----", "", true);
+        tv.Range = new SettingRange(0, 100, 2);
+        var state = new QuickSettingsState();
+        state.Record(QuickSettingsState.GameModeIds[0], "On", "1");
+        state.SetEnabled(QuickSettingsState.GameModeIds[0], true);
+        state.Refresh(tv);
+        Assert.Equal(-1, state.Volume);
+        Assert.True(state.CanEdit("brightness"));
+        Assert.Equal("Off", state.Name("sleeptimer"));
+        Assert.False(state.CanEdit("sleeptimer"));
+        Assert.Equal("", state.Value("game-mode"));
+        Assert.Equal("", state.Value(QuickSettingsState.GameModeIds[0]));
+        Assert.False(state.CanEdit(QuickSettingsState.GameModeIds[0]));
+        Assert.Equal((0d, 100d, 2d), (state.BrightnessMin, state.BrightnessMax, state.BrightnessStep));
+        tv.Volume = 12;
+        tv.Range = null;
+        state.Refresh(tv);
+        Assert.Equal(12, state.Volume);
+        Assert.Equal((0d, 50d, 1d), (state.BrightnessMin, state.BrightnessMax, state.BrightnessStep));
+        tv.RangeThrows = true;
+        tv.Range = new SettingRange(0, 100, 2);
+        state.Refresh(tv);
+        Assert.Equal((0d, 50d, 1d), (state.BrightnessMin, state.BrightnessMax, state.BrightnessStep));
+    }
+
+    /// <summary>
+    /// Stand-in for the TV's settings in these tests: items not listed in
+    /// <see cref="Items"/> throw when read, as when Samsung's library fails.
+    /// </summary>
+    sealed class FakeSettings : IQuickSettings
+    {
+        /// <summary>The items the TV reports, by menu ID.</summary>
+        public Dictionary<string, SettingReading> Items { get; } = new();
+
+        /// <summary>The volume the TV reports, or null.</summary>
+        public int? Volume { get; set; }
+
+        /// <summary>The brightness range the TV reports, or null.</summary>
+        public SettingRange? Range { get; set; }
+
+        /// <summary>When true, reading the range throws.</summary>
+        public bool RangeThrows { get; set; }
+
+        /// <summary>Returns <see cref="Volume"/>.</summary>
+        public int? GetVolume() => Volume;
+
+        /// <summary>Not used in these tests; refuses.</summary>
+        public bool SetVolume(int volume) => false;
+
+        /// <summary>Returns the listed item, or throws for any other ID.</summary>
+        public SettingReading ReadItem(string id) => Items.TryGetValue(id, out var item) ? item : throw new InvalidOperationException("no item");
+
+        /// <summary>Returns <see cref="Range"/>, or throws when <see cref="RangeThrows"/> is set.</summary>
+        public SettingRange? ReadRange(string id) => RangeThrows ? throw new InvalidOperationException("no range") : Range;
+
+        /// <summary>Not used in these tests; refuses.</summary>
+        public bool WriteItem(string id, string value) => false;
     }
 }

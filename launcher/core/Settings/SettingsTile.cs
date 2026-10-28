@@ -59,15 +59,16 @@ public sealed class SettingsTile
 
     /// <summary>
     /// Returns the big line on the tile: the current value of its setting, or a fixed label
-    /// for tiles that open other screens. Demo mode shows fixed sample values instead of
-    /// the TV's, so screenshots never depend on the TV's state.
+    /// for tiles that open other screens. In demo mode <paramref name="settings"/> holds the
+    /// demo values (<see cref="Platform.Demo.DemoQuickSettings"/>), so screenshots never
+    /// depend on the TV's state.
     /// </summary>
-    public string? ValueText(QuickSettingsState settings, bool dark, bool demo) => Id switch
+    public string? ValueText(QuickSettingsState settings, bool dark) => Id switch
     {
-        "volume" => demo ? "20" : settings.Volume < 0 ? QuickSettingsState.Unavailable : settings.Volume.ToString(),
-        "brightness" => demo ? "45" : settings.Name("brightness"),
-        "game-mode" => demo ? "Off" : settings.Name(settings.GameModeId),
-        "sleeptimer" => demo ? "Off" : settings.Name("sleeptimer"),
+        "volume" => settings.Volume < 0 ? QuickSettingsState.Unavailable : settings.Volume.ToString(),
+        "brightness" => settings.Name("brightness"),
+        "game-mode" => settings.Name(settings.GameModeId),
+        "sleeptimer" => settings.Name("sleeptimer"),
         "theme" => dark ? "Dark" : "Light",
         "controllers" => "Pair controller",
         "network" => "Connections",

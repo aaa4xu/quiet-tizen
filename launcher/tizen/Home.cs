@@ -4,7 +4,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Globalization;
 using System.Threading;
 using Tizen.NUI;
 using Tizen.NUI.BaseComponents;
@@ -12,15 +12,19 @@ using Tizen.Applications;
 using QuietHome.Core;
 using QuietHome.Core.Actions;
 using QuietHome.Core.Catalog;
+using QuietHome.Core.Diagnostics;
 using QuietHome.Core.Inputs;
 using QuietHome.Core.Navigation;
+using QuietHome.Core.Platform;
+using QuietHome.Core.Platform.Demo;
 using QuietHome.Core.Settings;
 using QuietHome.Core.Theme;
+using QuietHome.TizenHost.Platform;
 
 public sealed class QuietHomeApplication : NUIApplication
 {
- const string Root="/opt/usr/apps/"+QuietHomeContainer.AppId+"/res/quiet-home/";
- const string StateFile="/tmp/quiet-home-state.txt";
+ // The container's res/quiet-home/ (on the QE65S95F /opt/usr/apps/<container>/res/quiet-home/); set first in OnCreate.
+ string Root;
  sealed class Slot { public View Card,Shadow,FocusRing; public TextLabel Label; public string Name,Description; public HomeAction Action; public SettingsTile Tile; public int Row,X,Y,W,H; }
  sealed class CachedArtwork { public ImageView Image; public View Parent; }
  readonly List<Slot> slots=new List<Slot>();
@@ -32,14 +36,28 @@ public sealed class QuietHomeApplication : NUIApplication
  // Demo mode (quiet_demo=1) shows the public catalog, fixed inputs, settings and clock for README screenshots.
  bool demo;
  const string DemoIcons="/usr/apps/com.samsung.tv.theme-resource/shared/res/VD_ICONS/i_icon_device_m_";
+ static readonly InputSource[] DemoInputs={
+  new InputSource{ConnectionState=true,SourceType=0,IconPath=DemoIcons+"tv.svg"},
+  new InputSource{ConnectionState=true,SourceType=14,EditName="Game console",IconPath=DemoIcons+"gamepad.svg"},
+  new InputSource{ConnectionState=true,SourceType=15,IconPath=DemoIcons+"hdmi2.svg"}};
+ // The TV behind the core's ports. Demo mode swaps in the core's demo ports on each access, without restarting.
+ TizenInputSources tvInputs;DemoInputSources demoInputs;
+ readonly IQuickSettings tvSettings=new TizenQuickSettings();DemoQuickSettings demoSettings=new DemoQuickSettings();
+ IThemeStore themeStore;DemoThemeStore demoTheme=new DemoThemeStore();
+ readonly IClock systemClock=new SystemClock(),demoClock=new DemoClock();
+ readonly ISystemLauncher launcher=new TizenSystemLauncher();
+ readonly IDiagnostics diagnostics=new StateFile();
+ IInputSources Inputs=>demo?demoInputs:tvInputs;
+ IQuickSettings QuickSettings=>demo?demoSettings:tvSettings;
+ IThemeStore ThemeStore=>demo?demoTheme:themeStore;
+ IClock ClockSource=>demo?demoClock:systemClock;
+ static readonly int processId=Environment.ProcessId;
+ // The input list is read once per event; BuildPage reads it only on arriving at Home without a fresh reading.
+ bool inputsFresh;int builtPage=-1;
+ int artworkReady;string artworkPending="";
  string libraryError="";
  List<InputSource> inputSources=new List<InputSource>();
  string inputError="";
- // The TV calls this from its own thread; the delegate stays referenced while registered.
- [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void SourceListChanged(int what,IntPtr data);
- static readonly IntPtr SourceCallbackToken=new IntPtr(0x5157);
- SourceListChanged sourceListChanged;
- int sourceCallback=-1;
  TextLabel clock, notice, detail;
  TextLabel[] tabs;
  TextLabel toolbarHint;
@@ -60,30 +78,12 @@ public sealed class QuietHomeApplication : NUIApplication
  string themeError="";
  Color ink,muted,accent,tabFocus;
  readonly Color white=new Color(1,1,1,1);
- [DllImport("libsource-api.so")] static extern int connect_source(int sourceType);
- [DllImport("libsource-api.so")] static extern IntPtr get_source_list();
- [DllImport("libsource-api.so")] static extern int register_sourcelist_changed_callback(SourceListChanged cb,IntPtr data);
- [DllImport("libsource-api.so")] static extern int unregister_sourcelist_changed_callback(IntPtr data);
- [DllImport("libc.so.6")] static extern void free(IntPtr p);
- [DllImport("libvconf.so.0")] static extern int vconf_get_int(string key,out int value);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_create(out IntPtr app);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_set_app_id(IntPtr app,string id);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_set_operation(IntPtr app,string operation);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_add_extra_data(IntPtr app,string key,string value);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_send_launch_request(IntPtr app,IntPtr cb,IntPtr data);
- [DllImport("libcapi-appfw-app-control.so.0")] static extern int app_control_destroy(IntPtr app);
- [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_get_master_volume(out int value);
- [DllImport("libcapi-media-sound-manager-tv.so.0")] static extern int sound_manager_set_master_volume(int value);
- [DllImport("libsettings-api.so")] static extern bool CSharpGetItemValue(string id,out string name,out string value);
- [DllImport("libsettings-api.so")] static extern bool CSharpSetItemValue(string id,string value);
- [DllImport("libsettings-api.so")] static extern bool CSharpGetItemEnable(string id,out bool enabled);
- [DllImport("libsettings-api.so")] static extern bool CSharpGetItemMinMaxStepValue(string id,out double min,out double max,out double step);
-
-
-
  protected override void OnCreate()
  {
   base.OnCreate();
+  Root=System.IO.Path.Combine(this.DirectoryInfo.Resource,"quiet-home")+"/";
+  themeStore=new FileThemeStore(this.DirectoryInfo.Data);
+  tvInputs=new TizenInputSources();demoInputs=new DemoInputSources(tvInputs,DemoInputs);
   try{fontLoaded=FontClient.Instance.AddCustomFontDirectory(Root+"fonts");}catch{fontLoaded=false;}
   try{library=AppCatalog.Load(Root+"apps.json");}catch(Exception ex){libraryError=ex.Message;}
   ownLibrary=library;
@@ -91,7 +91,8 @@ public sealed class QuietHomeApplication : NUIApplication
   Window.Default.Title="Quiet Home";Window.Default.KeyEvent+=OnKey;
   // Samsung Home's source editor opens over this window without pausing it; reread the inputs on return.
   Window.Default.FocusChanged+=(s,e)=>{if(e.FocusGained){RefreshInputCards();WriteState("focus_gained");}};
-  WatchSources();
+  // Connecting or unplugging a device redraws the input cards.
+  tvInputs.Changed+=()=>{RefreshInputCards();WriteState("sources_changed");};tvInputs.Watch(SynchronizationContext.Current);
   PreloadArtwork();
   RefreshSource();selected=SourceIndex();BuildPage();
   clockTimer=new Tizen.NUI.Timer(30000);
@@ -105,7 +106,7 @@ public sealed class QuietHomeApplication : NUIApplication
   bool changed=ApplyLaunchOptions(options);
   if(options.Page==Page.Settings)OpenSettings("settings_request");
   else if(options.Page==Page.Apps){page=1;area=1;selected=0;libraryPage=0;BuildPage();}
-  else{if(changed&&tabs!=null){RefreshInputSources();page=0;area=1;navigator.Adjusting=Adjustment.None;selected=SourceIndex();BuildPage();}Home("home_request");}
+  else Home("home_request",changed);
  }
  // quiet_demo=1 enters demo mode and any other launch leaves it; quiet_theme=light|dark lasts until then
  // and is not saved. Returns whether the page must be rebuilt.
@@ -114,6 +115,7 @@ public sealed class QuietHomeApplication : NUIApplication
   bool wantDemo=options.Demo,changed=wantDemo!=demo;
   if(changed){
    demo=wantDemo;libraryPage=0;
+   if(demo){demoSettings=new DemoQuickSettings();demoTheme=new DemoThemeStore();}
    if(demo&&publicLibrary==null)try{publicLibrary=AppCatalog.Load(Root+"apps.public.json");}catch{publicLibrary=ownLibrary;}
    library=demo?publicLibrary:ownLibrary;
   }
@@ -121,33 +123,23 @@ public sealed class QuietHomeApplication : NUIApplication
   else if(changed&&!demo)LoadTheme();
   return changed;
  }
- string Clock(){return demo?"9:41 AM":DateTime.Now.ToString("h:mm tt");}
+ string Clock(){return ClockText.Format(ClockSource.Now,CultureInfo.CurrentCulture);}
  protected override void OnPause(){base.OnPause();navigator.Adjusting=Adjustment.None;clockTimer?.Stop();WriteState("paused");}
- void Home(string activity){clockTimer?.Start();RefreshSource();bool inputsChanged=RefreshInputSources();if(tabs!=null){bool unchanged=!inputsChanged&&page==0&&area==1&&navigator.Adjusting==Adjustment.None&&selected==SourceIndex();page=0;area=1;navigator.Adjusting=Adjustment.None;selected=SourceIndex();if(!unchanged)BuildPage();WriteState(activity);}}
+ // rebuild forces a new page, for a changed theme or demo mode.
+ void Home(string activity,bool rebuild=false){clockTimer?.Start();RefreshSource();bool inputsChanged=RefreshInputSources();if(tabs!=null){bool unchanged=!rebuild&&!inputsChanged&&page==0&&area==1&&navigator.Adjusting==Adjustment.None&&selected==SourceIndex();page=0;area=1;navigator.Adjusting=Adjustment.None;selected=SourceIndex();if(!unchanged)BuildPage();WriteState(activity);}}
  void OpenSettings(string activity){clockTimer?.Start();page=2;area=1;selected=0;navigator.Adjusting=Adjustment.None;BuildPage();WriteState(activity);}
- void RefreshSource(){try{int n;if(vconf_get_int("memory/system/source_type",out n)==0&&n>=0)lastSource=n;}catch{}}
+ void RefreshSource(){var n=Inputs.Current();if(n!=null)lastSource=n.Value;}
  // Input cards come from the TV's source list; the input cards are the page's first slots.
  int SourceIndex(){return demo?0:Math.Max(0,inputSources.FindIndex(s=>s.SourceType==lastSource));}
- // Returns whether the connected inputs changed. The list is a malloc'd JSON string owned by the caller.
+ // Returns whether the connected inputs changed.
  bool RefreshInputSources()
  {
   var before=InputList.Fingerprint(inputSources);
-  IntPtr p=IntPtr.Zero;inputError="";
-  if(demo)inputSources=new List<InputSource>{
-   new InputSource{ConnectionState=true,SourceType=0,IconPath=DemoIcons+"tv.svg"},
-   new InputSource{ConnectionState=true,SourceType=14,EditName="Game console",IconPath=DemoIcons+"gamepad.svg"},
-   new InputSource{ConnectionState=true,SourceType=15,IconPath=DemoIcons+"hdmi2.svg"}};
-  else try{
-   p=get_source_list();
-   if(p==IntPtr.Zero){inputSources=new List<InputSource>();inputError="empty";}
-   else inputSources=InputList.Parse(Marshal.PtrToStringAnsi(p));
-  }catch(Exception ex){inputSources=new List<InputSource>();inputError=ex.Message;}
-  finally{if(p!=IntPtr.Zero)free(p);}
+  var reading=Inputs.Read();inputSources=reading.Inputs;inputError=reading.Error;inputsFresh=true;
   return before!=InputList.Fingerprint(inputSources);
  }
  // Dark is the default; the choice is kept in the container's own data directory.
- string ThemeFile(){return System.IO.Path.Combine(this.DirectoryInfo.Data,"theme");}
- void LoadTheme(){try{dark=File.ReadAllText(ThemeFile()).Trim()!="light";}catch{dark=true;}ApplyTheme();}
+ void LoadTheme(){dark=ThemeSetting.IsDark(ThemeStore.Read());ApplyTheme();}
  void ApplyTheme()
  {
   var palette=ThemeColors.For(dark);
@@ -157,7 +149,7 @@ public sealed class QuietHomeApplication : NUIApplication
  void ToggleTheme()
  {
   dark=!dark;themeError="";
-  try{File.WriteAllText(ThemeFile(),dark?"dark":"light");}catch(Exception ex){themeError=ex.Message;}
+  try{ThemeStore.Write(ThemeSetting.Text(dark));}catch(Exception ex){themeError=ex.Message;}
   ApplyTheme();BuildPage();
   if(themeError!="")ShowError("Theme changed for now; it could not be saved.");
   WriteState("theme_changed");
@@ -171,6 +163,8 @@ public sealed class QuietHomeApplication : NUIApplication
  {return new TextLabel{Text=text,Position2D=new Position2D(x,y),Size2D=new Size2D(w,h),PixelSize=size,FontFamily="Quiet Inter "+face,TextColor=color,VerticalAlignment=VerticalAlignment.Center};}
  void BuildPage()
  {
+  // build_ms covers building the scene, not reading the TV's input list.
+  if(page==0&&builtPage!=0&&!inputsFresh)RefreshInputSources();
   var stopwatch=Stopwatch.StartNew();
   if(focusAnimation!=null){focusAnimation.Stop();focusAnimation.Dispose();focusAnimation=null;}
   ParkArtwork();pageArtworkCold=0;
@@ -181,7 +175,7 @@ public sealed class QuietHomeApplication : NUIApplication
   for(int i=0;i<3;i++){tabs[i]=Text(nav[i],tx[i],158,tw[i],68,30,muted);tabs[i].HorizontalAlignment=HorizontalAlignment.Center;}
   clock=Text(Clock(),1540,170,300,45,24,muted);clock.HorizontalAlignment=HorizontalAlignment.End;
   if(page==0){
-   RefreshInputSources();BuildInputs();
+   BuildInputs();
   }else if(page==1){
    BuildLibrary();
   }else{
@@ -203,16 +197,9 @@ public sealed class QuietHomeApplication : NUIApplication
   var hint=Text(page==1?(CatalogGrid.PageCount(library.Count)<=1?"Select to open · Back to Home":libraryPage+1<CatalogGrid.PageCount(library.Count)?"Down for more apps · Back to Home":"Up for previous apps · Back to Home"):"Back to input",1310,1030,530,35,20,muted);hint.HorizontalAlignment=HorizontalAlignment.End;
   navigator.SettleAfterBuild(Rows());
   UpdateFocus(false);
-  buildMilliseconds=stopwatch.ElapsedMilliseconds;WriteState("page_ready");
+  buildMilliseconds=stopwatch.ElapsedMilliseconds;builtPage=page;inputsFresh=false;CountArtwork();WriteState("page_ready");
  }
- // Connecting or unplugging a device redraws the input cards; 0 meant success on the QE65S95F.
- void WatchSources()
- {
-  var ui=SynchronizationContext.Current;if(ui==null)return;
-  sourceListChanged=(what,data)=>ui.Post(_=>{RefreshInputCards();WriteState("sources_changed");},null);
-  try{sourceCallback=register_sourcelist_changed_callback(sourceListChanged,SourceCallbackToken);}catch{sourceCallback=-2;}
- }
- protected override void OnTerminate(){if(sourceCallback==0)try{unregister_sourcelist_changed_callback(SourceCallbackToken);}catch{}base.OnTerminate();}
+ protected override void OnTerminate(){tvInputs?.Dispose();base.OnTerminate();}
  void RefreshInputCards(){if(tabs!=null&&page==0&&navigator.Adjusting==Adjustment.None&&RefreshInputSources())BuildPage();}
  void BuildInputs()
  {
@@ -304,8 +291,8 @@ public sealed class QuietHomeApplication : NUIApplication
   if(crop!=null)image.PixelArea=new RelativeVector4(crop[0],crop[1],crop[2],crop[3]);
   cached=new CachedArtwork{Image=image,Parent=artworkPreloadRoot};
   artworkCache.Add(key,cached);artworkViewsCreated++;
-  image.ResourceReady+=(s,e)=>WriteState("artwork_ready");
-  artworkPreloadRoot.Add(image);image.ResourceUrl=Root+app.Asset;
+  image.ResourceReady+=(s,e)=>{CountArtwork();WriteState("artwork_ready");};
+  artworkPreloadRoot.Add(image);image.ResourceUrl=Root+app.Asset;CountArtwork();
   return cached;
  }
  void ParkArtwork()
@@ -314,19 +301,15 @@ public sealed class QuietHomeApplication : NUIApplication
    cached.Parent.Remove(cached.Image);artworkPreloadRoot.Add(cached.Image);cached.Parent=artworkPreloadRoot;
   }
  }
- int ArtworkReadyCount()
+ // The diagnostics file reports these; they change only when an image is created or finishes loading.
+ void CountArtwork()
  {
-  int count=0;foreach(var cached in artworkCache.Values)
-   if(cached.Image.LoadingStatus==ImageView.LoadingStatusType.Ready)count++;
-  return count;
- }
- string ArtworkPending()
- {
-  var pending=new List<string>();
-  foreach(var entry in artworkCache)
-   if(entry.Value.Image.LoadingStatus!=ImageView.LoadingStatusType.Ready)
-    pending.Add(entry.Key+":"+entry.Value.Image.LoadingStatus);
-  return string.Join(";",pending);
+  int ready=0;var pending=new List<string>();
+  foreach(var entry in artworkCache){
+   if(entry.Value.Image.LoadingStatus==ImageView.LoadingStatusType.Ready)ready++;
+   else pending.Add(entry.Key+":"+entry.Value.Image.LoadingStatus);
+  }
+  artworkReady=ready;artworkPending=string.Join(";",pending);
  }
  void AddSettingsTile(SettingsTile tile)
  {
@@ -379,7 +362,7 @@ public sealed class QuietHomeApplication : NUIApplication
   clock.Opacity=area==3?0:1;toolbarHint.Text=area==3?slots[selected].Name:"";
   detail.Text=page==1&&area==1&&slots[selected].Row>=0?slots[selected].Name+" · "+slots[selected].Description:area==0?"":area==2?slots[selected].Name:"";
   if(page==2){
-   foreach(var s in slots)if(s.Tile!=null)s.Label.Text=s.Tile.ValueText(settings,dark,demo);
+   foreach(var s in slots)if(s.Tile!=null)s.Label.Text=s.Tile.ValueText(settings,dark);
    detail.Text="Your everyday controls";
   }
   if(navigator.Adjusting!=Adjustment.None)detail.Text="Left / Right to adjust "+navigator.Adjusting.Name()+" · Select or Back to finish";
@@ -422,52 +405,43 @@ public sealed class QuietHomeApplication : NUIApplication
   switch(a){
    case HomeAction.SwitchInput input:SelectSource(input.SourceType);return;
    case HomeAction.ShowPage show:page=(int)show.Page;selected=page==0?SourceIndex():0;area=1;BuildPage();return;
-   case HomeAction.LaunchApp app:Launch(app.AppId);return;
-   case HomeAction.OpenSamsungSettings menu:Launch("org.tizen.menu",menu.MenuItem);return;
-   case HomeAction.OpenSourceEditor:Launch("com.samsung.tv.csfs");return;
+   case HomeAction.LaunchApp app:Launch(new LaunchRequest(app.AppId));return;
+   case HomeAction.OpenSamsungSettings menu:Launch(LaunchRequest.SamsungSettings(menu.MenuItem));return;
+   case HomeAction.OpenSourceEditor:Launch(LaunchRequest.SourceEditor);return;
    case HomeAction.BeginAdjust adjust:RefreshSettings();if(adjust.Target==Adjustment.Brightness&&!settings.CanEdit("brightness")){ShowError("Brightness is unavailable for the current input.");return;}navigator.Adjusting=adjust.Target;UpdateFocus();return;
    case HomeAction.SwitchGameMode:RefreshSettings();var mode=settings.NextGameModeValue();if(mode!=null)SetSetting(settings.GameModeId,mode);return;
    case HomeAction.CycleSetting cycle:RefreshSettings();var next=settings.NextCycleValue(cycle.Id);if(next!=null)SetSetting(cycle.Id,next);return;
    case HomeAction.ToggleTheme:ToggleTheme();return;
   }
  }
- void RefreshSettings(){
-  settings.Volume=sound_manager_get_master_volume(out var v)==0?v:-1;
-  foreach(var id in QuickSettingsState.TvSettingIds){
-   try{bool read=CSharpGetItemValue(id,out var name,out var value);settings.Record(id,name,read?value:null);
-    settings.SetEnabled(id,CSharpGetItemEnable(id,out var enabled)&&enabled);
-   }catch{settings.Forget(id);}
-  }
-  try{bool reported=CSharpGetItemMinMaxStepValue("brightness",out var min,out var max,out var step);settings.SetBrightnessRange(reported,min,max,step);}catch{}
- }
+ void RefreshSettings(){settings.Refresh(QuickSettings);}
  void SetSetting(string id,string value){
   if(!settings.CanEdit(id)){ShowError("This setting is unavailable for the current input.");return;}
-  bool ok=false;try{ok=CSharpSetItemValue(id,value);}catch{}
+  bool ok=false;try{ok=QuickSettings.WriteItem(id,value);}catch{}
   RefreshSettings();UpdateFocus();
   bool verified=ok&&settings.Value(id)==value;
   if(!verified)ShowError("The TV could not apply this setting. Try Advanced settings.");
   WriteState("setting:"+id+":"+value+":"+verified);
  }
  void ChangeBrightness(int delta){var next=settings.NextBrightness(delta);if(next!=null)SetSetting("brightness",next);}
- void ChangeVolume(int delta){int n;int r=sound_manager_get_master_volume(out n);if(r==0)r=sound_manager_set_master_volume(QuickSettingsState.NextVolume(n,delta));if(r!=0)ShowError("Use the remote's volume buttons.");RefreshSettings();UpdateFocus();WriteState("volume_changed");}
- void SelectSource(int source){int r=connect_source(source);if(r<0){ShowError("Input could not be switched. Open Advanced settings to check the connection.");WriteState("source_failed:"+r);return;}lastSource=source;Launch("org.tizen.tv-viewer");}
- void Launch(string id,string menuItem=null)
+ void ChangeVolume(int delta){var n=QuickSettings.GetVolume();bool ok=n!=null&&QuickSettings.SetVolume(QuickSettingsState.NextVolume(n.Value,delta));if(!ok)ShowError("Use the remote's volume buttons.");RefreshSettings();UpdateFocus();WriteState("volume_changed");}
+ void SelectSource(int source){int r=Inputs.Switch(source);if(r<0){ShowError("Input could not be switched. Open Advanced settings to check the connection.");WriteState("source_failed:"+r);return;}lastSource=source;Launch(LaunchRequest.TvViewer);}
+ void Launch(LaunchRequest request)
  {
-  IntPtr c;int r=app_control_create(out c);if(r!=0){ShowError("Could not open the app.");return;}
-  try{r=app_control_set_app_id(c,id);if(r==0)r=app_control_set_operation(c,"http://tizen.org/appcontrol/operation/default");
-   if(r==0&&id=="org.tizen.menu"){
-    if(menuItem!=null){
-     r=app_control_add_extra_data(c,"menuitem",menuItem);
-     if(r==0)r=app_control_add_extra_data(c,"launchoption","pressed");
-    }
-    if(r==0)r=app_control_add_extra_data(c,"__K_EX_FORCE_BOOST","enable");
-    if(r==0)r=app_control_add_extra_data(c,"__K_SPLASH_SCREEN","LA_UI_VR_TRANSPARENT");
-   }
-   // The Source key's entry point opens Samsung Home on its source list.
-   if(r==0&&id=="com.samsung.tv.csfs")r=app_control_add_extra_data(c,"entry_point","source_key");
-   if(r==0)r=app_control_send_launch_request(c,IntPtr.Zero,IntPtr.Zero);WriteState("launch:"+id+(menuItem==null?"":":"+menuItem)+":"+r);if(r!=0)ShowError("Could not open this screen. Try Advanced settings.");}finally{app_control_destroy(c);}
+  var result=launcher.Launch(request);if(!result.Created){ShowError("Could not open the app.");return;}
+  WriteState(request.Activity(result.Code));if(result.Code!=0)ShowError("Could not open this screen. Try Advanced settings.");
  }
  void ShowError(string text){notice.Text=text;}
- void WriteState(string activity){try{File.WriteAllText(StateFile,DateTime.UtcNow.ToString("o")+"\npage="+page+"\nselected="+selected+"\narea="+area+"\nactivity="+activity+"\nkey="+keys.LastKey+"\nfont_loaded="+fontLoaded+"\nstyle=free-my-tv\ntheme="+(dark?"dark":"light")+"\ntheme_error="+themeError+"\ndemo="+demo+"\nbuild_ms="+buildMilliseconds+"\nlibrary_page="+libraryPage+"\nlibrary_count="+library.Count+"\nlibrary_error="+libraryError+"\ninputs="+string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString()))+"\ninput_error="+inputError+"\nsource_callback="+sourceCallback+"\nselected_name="+(selected>=0&&selected<slots.Count?slots[selected].Name:"")+"\nartwork_cached="+artworkCache.Count+"\nartwork_ready="+ArtworkReadyCount()+"\nartwork_pending="+ArtworkPending()+"\nartwork_views_created="+artworkViewsCreated+"\npage_artwork_cold="+pageArtworkCold+"\nprocess_id="+Process.GetCurrentProcess().Id+"\nediting="+navigator.Adjusting.Name()+"\nvolume="+settings.Volume+"\nbrightness="+settings.Value("brightness")+"\ngame-mode="+settings.Value(settings.GameModeId)+"\nsleeptimer="+settings.Value("sleeptimer")+"\n");}catch{}}
+ void WriteState(string activity)
+ {
+  try{diagnostics.Write(new StateReport{
+   Page=navigator.Page,Selected=selected,Zone=navigator.Zone,Activity=activity,Key=keys.LastKey,FontLoaded=fontLoaded,Dark=dark,ThemeError=themeError,Demo=demo,
+   BuildMilliseconds=buildMilliseconds,LibraryPage=libraryPage,LibraryCount=library.Count,LibraryError=libraryError,
+   Inputs=string.Join(",",inputSources.ConvertAll(s=>s.SourceType.ToString())),InputError=inputError,SourceCallback=tvInputs?.WatchStatus??-1,
+   SelectedName=selected>=0&&selected<slots.Count?slots[selected].Name:"",
+   ArtworkCached=artworkCache.Count,ArtworkReady=artworkReady,ArtworkPending=artworkPending,ArtworkViewsCreated=artworkViewsCreated,PageArtworkCold=pageArtworkCold,
+   ProcessId=processId,Editing=navigator.Adjusting,Volume=settings.Volume,
+   Brightness=settings.Value("brightness"),GameMode=settings.Value(settings.GameModeId),SleepTimer=settings.Value("sleeptimer")}.Format(DateTime.UtcNow));}catch{}
+ }
  public static void Main(string[] args){using(var app=new QuietHomeApplication())app.Run(args);}
 }

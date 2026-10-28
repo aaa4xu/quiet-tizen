@@ -153,7 +153,12 @@ Verify visibly:
 - The Controllers shortcut reaches the Bluetooth device list.
 
 The `build_ms` value in `/tmp/quiet-home-state.txt` measures scene construction,
-not input-to-photon latency or complete rendering time.
+not input-to-photon latency or complete rendering time. It does not include
+reading the TV's input list: the list is read once per event (start, resume,
+window focus, the TV's change callback, a Home request and arriving at the
+Home page) and kept, and the Home page is built from the kept list. Values
+from builds before this change also counted `get_source_list()` and are not
+comparable.
 
 To see what the TV draws without a camera, Probe can capture the UI layer
 with `efl_util_screenshot` and write it as a PNG small enough for `tv pull`:
@@ -172,7 +177,8 @@ account names, app lists and other personal details.
 The README screenshots come from Quiet Home's demo mode. A launch with the
 extra `quiet_demo=1` shows the public catalog (packaged as
 `apps.public.json`), three sample inputs, fixed settings values and a 9:41
-clock; `quiet_theme=light|dark` picks a theme without saving it, and
+clock. Settings and the theme changed during a demo stay in memory and change
+nothing on the TV; each demo starts from the same values. `quiet_theme=light|dark` picks a theme without saving it, and
 `quiet_page=home|apps|settings` a page. Any launch without `quiet_demo`
 returns to the normal state. With the launcher installed, refresh all six
 images with:

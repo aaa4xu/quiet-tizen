@@ -70,8 +70,9 @@ session; allow its cleanup checks to complete first.
 
 ## C# code
 
-New or substantially rewritten C# (`launcher/core`, `tests/QuietHome.Core.Tests`
-and whatever is taken out of `launcher/tizen/Home.cs`) must be clear to a
+New or substantially rewritten C# (`launcher/core`, `tests/QuietHome.Core.Tests`,
+`launcher/tizen/Interop`, `launcher/tizen/Platform` and whatever else is taken
+out of `launcher/tizen/Home.cs`) must be clear to a
 reader who sees only that file, including an agent on a much simpler model.
 
 - Every class, struct, interface and enum has a `///` comment on its place in

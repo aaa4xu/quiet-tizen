@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using QuietHome.Core.Platform;
 
 namespace QuietHome.Core.Settings;
 
 /// <summary>
 /// The latest values of the TV settings that the Settings page shows and changes: volume,
-/// brightness, game mode and sleep timer. The TV host fills it from Samsung's settings and
-/// sound APIs each time the page is shown or a setting is changed; this class holds the
+/// brightness, game mode and sleep timer. The TV host fills it with <see cref="Refresh"/>
+/// from an <see cref="IQuickSettings"/> each time the page is shown or a setting is changed; this class holds the
 /// values and the rules for the next value (for example, the sleep timer's next step),
 /// so those rules can be tested without the TV. Setting IDs are Samsung's own
 /// ("brightness", "game-mode", "sleeptimer"); <see cref="TvSettingIds"/> lists them all.
@@ -62,6 +63,39 @@ public sealed class QuickSettingsState
         {
             values.Remove(id);
             names.Remove(id);
+        }
+    }
+
+    /// <summary>
+    /// Rereads everything the Settings page shows from <paramref name="tv"/>: the volume
+    /// (-1 when not reported), each of <see cref="TvSettingIds"/> and the brightness range.
+    /// A menu item whose reading throws is forgotten; a range that cannot be read keeps the
+    /// previous one.
+    /// </summary>
+    public void Refresh(IQuickSettings tv)
+    {
+        Volume = tv.GetVolume() ?? -1;
+        foreach (var id in TvSettingIds)
+        {
+            try
+            {
+                var item = tv.ReadItem(id);
+                Record(id, item.Name, item.Value);
+                SetEnabled(id, item.Enabled);
+            }
+            catch (Exception)
+            {
+                Forget(id);
+            }
+        }
+        try
+        {
+            var range = tv.ReadRange("brightness");
+            SetBrightnessRange(range != null, range?.Min ?? 0, range?.Max ?? 0, range?.Step ?? 0);
+        }
+        catch (Exception)
+        {
+            // Keep the range read last time.
         }
     }
 
