@@ -18,6 +18,8 @@ for theme in dark light; do
         app_launcher -u 5001 -s "$app" quiet_demo 1 quiet_theme "$theme" quiet_page "$page" >/dev/null
         sleep 1
         /usr/bin/dotnet "$S/Probe.dll" screenshot "/tmp/quiet-readme-$page-$theme.png" 2>/dev/null | grep '^screenshot='
+        # build_ms and the page state of this frame; the next launch overwrites the file.
+        cp /tmp/quiet-home-state.txt "/tmp/quiet-readme-$page-$theme.state"
     done
 done
 # A launch without quiet_demo returns to the owner's catalog, inputs and saved theme.
