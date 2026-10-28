@@ -175,6 +175,23 @@ UI is captured: an HDMI or TV picture comes out black, and so does the whole
 frame while the screen is off. Keep the images in `.local/`; they can show
 account names, app lists and other personal details.
 
+The README screenshots come from Quiet Home's demo mode. A launch with the
+extra `quiet_demo=1` shows the public catalog (packaged as
+`apps.public.json`), three sample inputs, fixed settings values and a 9:41
+clock; `quiet_theme=light|dark` picks a theme without saving it, and
+`quiet_page=home|apps|settings` a page. Any launch without `quiet_demo`
+returns to the normal state. With the launcher installed, refresh all six
+images with:
+
+```sh
+python3 tools/screens.py --host "$TV_IP" --sdb "$SDB" --profile profiles/qe65s95fauxru-1301.0.json
+```
+
+Before each frame the recipe closes Samsung's screen saver
+(`com.samsung.tv.glscreensaver-launcher`) if it is running; the Screen Saver
+setting itself is left on. The script still refuses to write `docs/screens/`
+if a frame comes out black, for example when the screen turned off.
+
 ## Make it open on Home and startup
 
 Save the **three original values** privately first: the main-operation Home
