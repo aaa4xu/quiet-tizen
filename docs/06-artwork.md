@@ -17,7 +17,8 @@ centered plus symbol; its regular caption remains below the card.
 
 ## Optional publisher artwork
 
-The public repository ships text-only placeholders. Official/publisher
+The public repository ships plain placeholders; the launcher writes each
+app's name over its catalog `Background` color. Official/publisher
 artwork is fetched locally rather than redistributed under our code license:
 
 ```sh

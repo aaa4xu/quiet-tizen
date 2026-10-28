@@ -14,8 +14,8 @@ optical size 32. See `licenses/Inter-OFL.txt`. These font files retain the
 SIL Open Font License; the repository's MIT license does not replace it.
 
 The Material Symbols PNGs come through Free My TV and retain Apache 2.0:
-`licenses/Material-Symbols-Apache-2.txt`. Console illustrations, gradient
-cards and text-only app placeholders were produced for this launcher.
+`licenses/Material-Symbols-Apache-2.txt`. Gradient cards and app
+placeholders were produced for this launcher.
 
 The source subset in `vendor/samsung_tv_root/` and `vendor/payload-source/`
 comes from [samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b),

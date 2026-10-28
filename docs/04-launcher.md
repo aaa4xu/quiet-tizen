@@ -46,7 +46,7 @@ This builds `BixbyPromotion.dll`, `QuickLaunch.dll` and `Probe.dll`, then
 assembles `.local/package/`. For another documented model, add its profile, for
 example `--profile profiles/qe65s95fauxru-1301.0.json`; the profile's
 `launcher` block names the host package and the entry assembly to build.
-Public source cards are neutral text placeholders;
+Public app cards are plain placeholders showing the app's name;
 [optional publisher artwork](06-artwork.md) can be fetched before rebuilding.
 
 ## Adapt inputs and apps

@@ -244,6 +244,12 @@ public sealed class QuietHome : NUIApplication
    if(cached.Image.LoadingStatus!=ImageView.LoadingStatusType.Ready)pageArtworkCold++;
    cached.Parent.Remove(cached.Image);card.Add(cached.Image);cached.Parent=card;
   }
+  // Placeholders carry no text (the TV's SVG renderer draws none), so the name goes on top.
+  if(app.Asset.StartsWith("placeholders/")){
+   var bg=HexColor(app.Background);bool light=.2126f*bg.R+.7152f*bg.G+.0722f*bg.B>.6f;
+   var name=Label(app.Name,16,0,w-32,h,(float)Math.Round(h*.17),light?new Color(.11f,.11f,.12f,1):white,"Semibold");
+   name.HorizontalAlignment=HorizontalAlignment.Center;name.MultiLine=true;card.Add(name);
+  }
   if(app.Utility){
    card.Add(new View{Position2D=new Position2D(w/2-28,h/2-2),Size2D=new Size2D(56,4),BackgroundColor=ink});
    card.Add(new View{Position2D=new Position2D(w/2-2,h/2-28),Size2D=new Size2D(4,56),BackgroundColor=ink});
@@ -267,12 +273,16 @@ public sealed class QuietHome : NUIApplication
   bool cover=app.Fit=="cover",full=cover||app.Fit=="contain-full";
   int iw=full?w:w-54,ih=full?h:h-40;var crop=app.Crop;
   float cropWidth=crop==null?1:crop[2],cropHeight=crop==null?1:crop[3];
+  // SVG art keeps its aspect even with ScaleToFill; fit it to the cell and let the card color fill the rest.
+  // Placeholders stretch instead (preserveAspectRatio="none").
+  if(cover&&!app.Asset.StartsWith("placeholders/")){double aspect=app.Width*cropWidth/(app.Height*cropHeight);iw=(int)Math.Min(w,Math.Round(h*aspect));ih=(int)Math.Min(h,Math.Round(w/aspect));}
+  float radius=iw==w&&ih==h?18:0;
   var image=new ImageView{
    Position2D=new Position2D((w-iw)/2,(h-ih)/2),Size2D=new Size2D(iw,ih),
    FittingMode=cover?FittingModeType.ScaleToFill:FittingModeType.ShrinkToFit,
    SamplingMode=SamplingModeType.BoxThenLanczos,
    DesiredWidth=(int)Math.Ceiling(iw*2/cropWidth),DesiredHeight=(int)Math.Ceiling(ih*2/cropHeight),
-   ReleasePolicy=ReleasePolicyType.Destroyed,CornerRadius=new Vector4(18,18,18,18)};
+   ReleasePolicy=ReleasePolicyType.Destroyed,CornerRadius=new Vector4(radius,radius,radius,radius)};
   if(crop!=null)image.PixelArea=new RelativeVector4(crop[0],crop[1],crop[2],crop[3]);
   cached=new CachedArtwork{Image=image,Parent=artworkPreloadRoot};
   artworkCache.Add(key,cached);artworkViewsCreated++;
