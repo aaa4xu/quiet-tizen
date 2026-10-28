@@ -4,13 +4,28 @@ A practical, agent-readable guide to making a Samsung Tizen TV quieter and
 more useful as an HDMI display.
 
 This project documents work performed on one **Samsung UN75U8000FFXZA (2025
-U8000F)**. It includes **Quiet Home**, a native launcher with a colorful,
-English-language interface, lightweight settings, local app cards and a
-shortcut to native Bluetooth controller pairing.
+U8000F)**. It includes **Quiet Home**, a native launcher with dark and light
+English-language themes, cards for the inputs the TV reports, lightweight
+settings, local app cards and a shortcut to native Bluetooth controller pairing.
 
-![Quiet Home layout illustration](docs/quiet-home-preview.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screens/home-dark.webp">
+  <img alt="Quiet Home: input cards above a dock of app shortcuts" src="docs/screens/home-light.webp">
+</picture>
 
-*Layout illustration with the public text-only app cards. Input labels are configurable.*
+<table><tr>
+<td><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screens/apps-dark.webp">
+  <img alt="Quiet Home's app grid" src="docs/screens/apps-light.webp">
+</picture></td>
+<td><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screens/settings-dark.webp">
+  <img alt="Quiet Home's quick settings" src="docs/screens/settings-light.webp">
+</picture></td>
+</tr></table>
+
+*Captured from a QE65S95F in Quiet Home's demo mode: the public placeholder
+catalog and sample inputs. `tools/screens.py` refreshes them.*
 
 It also includes targeted cleanup profiles, source-build tools and rollback
 recipes. **It is a working case study with a reusable toolkit, not a universal
