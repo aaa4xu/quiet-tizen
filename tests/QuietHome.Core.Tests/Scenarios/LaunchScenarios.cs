@@ -8,7 +8,7 @@ using Xunit;
 namespace QuietHome.Core.Tests.Scenarios;
 
 /// <summary>
-/// Scenario tests of the launch extras (<c>quiet_page</c>, <c>quiet_demo</c>,
+/// Scenario tests of the launch extras (<c>quiet_page</c>, <c>quiet_focus</c>, <c>quiet_demo</c>,
 /// <c>quiet_theme</c>) that QuickLaunch and the README screenshot recipe send, played on
 /// <see cref="HomeHarness"/>.
 /// </summary>
@@ -32,6 +32,28 @@ public sealed class LaunchScenarios : IDisposable
         Assert.Contains("\nactivity=settings_request\n", home.Tv.State);
         home.Launch();
         Assert.IsType<HomePageModel>(home.Screen.Content);
+        Assert.Equal("Console", home.Focused);
+    }
+
+    /// <summary>
+    /// <c>quiet_focus=toolbar</c> focuses the page's first toolbar button, which the remote
+    /// leaves as usual; the next launch without it focuses the page's cards again.
+    /// </summary>
+    [Fact]
+    public void FocusExtraFocusesTheToolbar()
+    {
+        home.Open();
+        home.Launch(("quiet_focus", "toolbar"));
+        Assert.Equal("Edit inputs", home.Focused);
+        Assert.Equal("Edit inputs", home.Screen.Chrome.ToolbarHint);
+        Assert.Contains("\nactivity=toolbar_request\n", home.Tv.State);
+        home.Press(RemoteKey.Right);
+        Assert.Equal("Apps", home.Focused);
+        home.Press(RemoteKey.Down);
+        Assert.Equal("Live TV", home.Focused);
+        home.Launch(("quiet_page", "settings"), ("quiet_focus", "toolbar"));
+        Assert.Equal("Apps", home.Focused);
+        home.Launch();
         Assert.Equal("Console", home.Focused);
     }
 

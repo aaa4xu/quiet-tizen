@@ -8,8 +8,9 @@ namespace QuietHome.Core;
 /// every request it receives, including requests to the already running app, and
 /// <see cref="HomeController.AppControl"/> applies them:
 /// <c>quiet_demo=1</c> turns demo mode on (any launch without it turns it off),
-/// <c>quiet_theme=light|dark</c> overrides the theme until demo mode ends, and
-/// <c>quiet_page=apps|settings</c> opens that page. The README screenshot recipe uses all three.
+/// <c>quiet_theme=light|dark</c> overrides the theme until demo mode ends,
+/// <c>quiet_page=apps|settings</c> opens that page and <c>quiet_focus=toolbar</c> puts the
+/// focus on the page's first toolbar button. The README screenshot recipe uses all four.
 /// </summary>
 public sealed class LaunchOptions
 {
@@ -22,12 +23,16 @@ public sealed class LaunchOptions
     /// <summary>The page to open; <see cref="Navigation.Page.Home"/> unless the request names Apps or Settings.</summary>
     public Page Page { get; }
 
+    /// <summary>True when the request asks for the focus on the first toolbar button instead of the page's first card.</summary>
+    public bool FocusToolbar { get; }
+
     /// <summary>Creates options; use <see cref="Parse"/> to read them from a request.</summary>
-    LaunchOptions(bool demo, bool? dark, Page page)
+    LaunchOptions(bool demo, bool? dark, Page page, bool focusToolbar)
     {
         Demo = demo;
         Dark = dark;
         Page = page;
+        FocusToolbar = focusToolbar;
     }
 
     /// <summary>
@@ -43,6 +48,7 @@ public sealed class LaunchOptions
             "apps" => Page.Apps,
             _ => Page.Home,
         };
-        return new LaunchOptions(extra("quiet_demo") == "1", theme == "dark" ? true : theme == "light" ? false : null, page);
+        return new LaunchOptions(extra("quiet_demo") == "1", theme == "dark" ? true : theme == "light" ? false : null, page,
+            extra("quiet_focus") == "toolbar");
     }
 }

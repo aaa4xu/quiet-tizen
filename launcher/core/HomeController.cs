@@ -145,7 +145,8 @@ public sealed class HomeController
 
     /// <summary>
     /// The TV launched the app again with <paramref name="options"/> (Home key, QuickLaunch,
-    /// README screenshots): applies demo mode and theme, then shows the asked page.
+    /// README screenshots): applies demo mode and theme, then shows the asked page, focused on
+    /// its first toolbar button when the options ask for it.
     /// </summary>
     public void AppControl(LaunchOptions options)
     {
@@ -165,6 +166,13 @@ public sealed class HomeController
         else
         {
             Home("home_request", changed);
+        }
+        if (options.FocusToolbar && screen != null)
+        {
+            navigator.Zone = Zone.Toolbar;
+            navigator.Selected = screen.Rows.Row(-1)[0];
+            Render(RenderMode.Refresh);
+            WriteState("toolbar_request");
         }
     }
 

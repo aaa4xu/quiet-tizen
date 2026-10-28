@@ -1,13 +1,14 @@
 from contextlib import redirect_stdout
 import io
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from screen_compare import FRAMES, compare, main
+from screen_compare import FRAMES, SHOTS, compare, main
 
 
 def write_run(directory, png=b"frame", build_ms="40", selected="0"):
@@ -64,6 +65,11 @@ class ScreenCompareTests(unittest.TestCase):
             # Not a PNG: the report says so instead of stopping.
             (self.current / "settings-dark.png").write_bytes(b"other")
             self.assertEqual(main([str(self.reference), str(self.current)]), 1)
+
+    def test_recipe_takes_every_compared_shot(self):
+        recipe = (ROOT / "recipes/readme-screens.sh").read_text(encoding="utf-8")
+        self.assertEqual(tuple(re.search(r"^for shot in (.+); do$", recipe, re.M).group(1).split()), SHOTS)
+        self.assertIn("quiet_page home quiet_focus toolbar", recipe)
 
 
 if __name__ == "__main__":

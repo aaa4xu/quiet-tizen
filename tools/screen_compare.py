@@ -16,7 +16,9 @@ import sys
 
 PAGES = ("home", "apps", "settings")
 THEMES = ("dark", "light")
-FRAMES = tuple(f"{page}-{theme}" for theme in THEMES for page in PAGES)
+# Frames kept only for comparing builds, not README images: "toolbar" is Home with its first toolbar button focused.
+SHOTS = PAGES + ("toolbar",)
+FRAMES = tuple(f"{shot}-{theme}" for theme in THEMES for shot in SHOTS)
 # These differ between two runs of one build: the process, timing and artwork that loads asynchronously.
 VOLATILE = {"process_id", "build_ms", "activity", "artwork_ready", "artwork_pending"}
 

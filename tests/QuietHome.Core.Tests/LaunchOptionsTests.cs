@@ -19,27 +19,30 @@ public class LaunchOptionsTests
         Assert.False(options.Demo);
         Assert.Null(options.Dark);
         Assert.Equal(Page.Home, options.Page);
+        Assert.False(options.FocusToolbar);
     }
 
-    /// <summary>The README screenshot recipe's request: demo mode, a theme and a page.</summary>
+    /// <summary>The README screenshot recipe's request: demo mode, a theme, a page and the toolbar focus.</summary>
     [Fact]
     public void ScreenshotRequest()
     {
-        var options = Parse(new() { ["quiet_demo"] = "1", ["quiet_theme"] = "light", ["quiet_page"] = "settings" });
+        var options = Parse(new() { ["quiet_demo"] = "1", ["quiet_theme"] = "light", ["quiet_page"] = "settings", ["quiet_focus"] = "toolbar" });
         Assert.True(options.Demo);
         Assert.False(options.Dark);
         Assert.Equal(Page.Settings, options.Page);
+        Assert.True(options.FocusToolbar);
         Assert.Equal(Page.Apps, Parse(new() { ["quiet_page"] = "apps" }).Page);
         Assert.True(Parse(new() { ["quiet_theme"] = "dark" }).Dark);
     }
 
-    /// <summary>Unknown values are ignored: only "1" turns demo on, and an unknown theme or page changes nothing.</summary>
+    /// <summary>Unknown values are ignored: only "1" turns demo on, and an unknown theme, page or focus changes nothing.</summary>
     [Fact]
     public void UnknownValues()
     {
-        var options = Parse(new() { ["quiet_demo"] = "true", ["quiet_theme"] = "blue", ["quiet_page"] = "home" });
+        var options = Parse(new() { ["quiet_demo"] = "true", ["quiet_theme"] = "blue", ["quiet_page"] = "home", ["quiet_focus"] = "tabs" });
         Assert.False(options.Demo);
         Assert.Null(options.Dark);
         Assert.Equal(Page.Home, options.Page);
+        Assert.False(options.FocusToolbar);
     }
 }

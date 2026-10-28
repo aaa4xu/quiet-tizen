@@ -49,7 +49,10 @@ example `--profile profiles/qe65s95fauxru-1301.0.json`; the profile's
 Public app cards are plain placeholders showing the app's name;
 [optional publisher artwork](06-artwork.md) can be fetched before rebuilding.
 
-## Adapt inputs and apps
+## Adapt inputs and `quiet_page=home|apps|settings` a page, and `quiet_focus=toolbar` puts the focus
+on the page's first toolbar button. Any launch without `quiet_demo`
+returns to the normal state. With the launcher installed, refresh all six
+images with:
 
 The Home page builds one card per connected input from `get_source_list()` in
 Samsung's `libsource-api.so`, and switches with the returned `sourceType`.
@@ -181,6 +184,10 @@ images with:
 ```sh
 python3 tools/screens.py --host "$TV_IP" --sdb "$SDB" --profile profiles/qe65s95fauxru-1301.0.json
 ```
+
+The same run also takes Home with its first toolbar button focused in both
+themes (`toolbar-dark` and `toolbar-light`). These frames are only for
+comparing builds and do not go into the README.
 
 Before each frame the recipe closes Samsung's screen saver
 (`com.samsung.tv.glscreensaver-launcher`) if it is running; the Screen Saver
@@ -486,7 +493,8 @@ python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
   --keep 3 --compare .local/baseline/PREVIOUS
 ```
 
-The demo frames are reproducible byte for byte. A change that should not
+The demo frames (the three pages and a focused toolbar button, in both
+themes) are reproducible byte for byte. A change that should not
 alter what is drawn must therefore match the previous run's frames exactly. A
 visual change makes its own run the new baseline. Then check by hand with the
 remote what the frames do not show:

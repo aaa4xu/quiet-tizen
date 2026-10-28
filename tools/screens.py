@@ -4,7 +4,9 @@
 Quiet Home and Probe must already be built (tools/build.py launcher) and
 installed. Quiet Home's demo mode shows the public catalog, fixed inputs,
 settings and clock, so the images carry no personal data and only change
-when the interface does. Review the images before committing them.
+when the interface does. Review the images before committing them. Each run also
+takes Home with its first toolbar button focused in both themes; those frames
+are only for comparing builds and do not go into the README.
 
   python3 tools/screens.py --host 10.0.0.5 --sdb PATH/TO/sdb
 
@@ -58,11 +60,12 @@ def main():
     raw.mkdir(parents=True, exist_ok=True)
     run("push", str(probe), "Probe.dll")
     try:
-        run("exec", "--script", str(ROOT / "recipes/readme-screens.sh"), "--arg", app_id)
+        for theme in THEMES:
+            run("exec", "--script", str(ROOT / "recipes/readme-screens.sh"), "--arg", app_id, "--arg", theme)
         for path, local in remote.items():
             run("pull", path, str(local))
     finally:
-        # The recipe removes Probe.dll itself; this also covers a run that stopped early.
+        # Probe.dll stays staged between the themes' runs; this also covers a run that stopped early.
         run("exec", "--command", "rm -f /home/owner/share/tmp/sdk_tools/quiet-tizen/Probe.dll " + " ".join(remote))
     if args.compare:
         lines, matched = compare(args.compare, raw)
@@ -72,24 +75,26 @@ def main():
     # Only the black-frame check and the README images need Pillow.
     from PIL import Image, ImageStat
     images = {}
-    for theme in THEMES:
-        for page in PAGES:
-            image = Image.open(raw / f"{page}-{theme}.png").convert("RGB")
-            # A sleeping screen or the screensaver captures as an almost black frame.
-            if sum(ImageStat.Stat(image.convert("L")).mean) < 8:
-                sys.exit(f"{page}-{theme} came out black; wake the TV and run again. docs/screens/ was not changed.")
-            images[page, theme] = image
+    for frame in FRAMES:
+        image = Image.open(raw / f"{frame}.png").convert("RGB")
+        # A sleeping screen or the screensaver captures as an almost black frame.
+        if sum(ImageStat.Stat(image.convert("L")).mean) < 8:
+            sys.exit(f"{frame} came out black; wake the TV and run again. docs/screens/ was not changed.")
+        images[frame] = image
     if args.out:
         print(f"Raw frames and state: {raw}")
         return
     out = ROOT / "docs/screens"
     out.mkdir(exist_ok=True)
-    for (page, theme), image in images.items():
-        image = image.resize((WIDTH, round(image.height * WIDTH / image.width)), Image.LANCZOS)
-        # Lossy WebP at q90 looks the same as PNG here at a fifth of the size; a palette PNG bands.
-        target = out / f"{page}-{theme}.webp"
-        image.save(target, quality=90, method=6)
-        print(f"{target.relative_to(ROOT)}: {target.stat().st_size // 1024} KiB")
+    # The toolbar frames are only for comparing builds; the README shows the pages.
+    for theme in THEMES:
+        for page in PAGES:
+            image = images[f"{page}-{theme}"]
+            image = image.resize((WIDTH, round(image.height * WIDTH / image.width)), Image.LANCZOS)
+            # Lossy WebP at q90 looks the same as PNG here at a fifth of the size; a palette PNG bands.
+            target = out / f"{page}-{theme}.webp"
+            image.save(target, quality=90, method=6)
+            print(f"{target.relative_to(ROOT)}: {target.stat().st_size // 1024} KiB")
     print("Review docs/screens/ before committing.")
 
 
