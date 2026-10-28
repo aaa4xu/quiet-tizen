@@ -21,7 +21,7 @@ public sealed class LibraryApp
     /// <summary>Text shown at the bottom of the screen while the card has focus.</summary>
     public string? Description { get; set; }
 
-    /// <summary>How the artwork fills the card: "cover", "contain" or "contain-full".</summary>
+    /// <summary>How the artwork fills the card: "cover", "contain" or "contain-full" (see <see cref="AppCatalog.Fits"/>).</summary>
     public string Fit { get; set; } = "cover";
 
     /// <summary>Card color behind the artwork, as "#RRGGBB".</summary>

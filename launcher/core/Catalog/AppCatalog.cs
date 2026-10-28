@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace QuietHome.Core.Catalog;
 
@@ -16,10 +18,19 @@ public static class AppCatalog
     public const int DockSize = 5;
 
     /// <summary>
+    /// The values <see cref="LibraryApp.Fit"/> may take: "cover" fills the card, "contain"
+    /// fits the artwork inside a margin, "contain-full" fits it to the whole card.
+    /// </summary>
+    public static IReadOnlyList<string> Fits { get; } = new[] { "cover", "contain", "contain-full" };
+
+    static readonly Regex hexColor = new(@"^#[0-9A-Fa-f]{6}\z");
+
+    /// <summary>
     /// Reads the catalog from a JSON file and checks every entry. Throws
     /// <see cref="InvalidDataException"/> when the catalog is empty, an entry lacks a name,
     /// ID, artwork or size, two entries share an ID, the artwork path leaves the catalog's
-    /// folder, or a crop is outside the image. The caller shows the error instead of the cards.
+    /// folder, the card color is not "#RRGGBB", the fit is not one of <see cref="Fits"/>, or a
+    /// crop is outside the image. The caller shows the error instead of the cards.
     /// </summary>
     public static List<LibraryApp> Load(string path)
     {
@@ -31,7 +42,8 @@ public static class AppCatalog
         {
             if (string.IsNullOrWhiteSpace(app.Name) || string.IsNullOrWhiteSpace(app.Id) || !ids.Add(app.Id)
                 || string.IsNullOrWhiteSpace(app.Asset) || Path.IsPathRooted(app.Asset) || app.Asset.Contains("..")
-                || app.Width <= 0 || app.Height <= 0)
+                || app.Width <= 0 || app.Height <= 0
+                || app.Background == null || !hexColor.IsMatch(app.Background) || !Fits.Contains(app.Fit))
                 throw new InvalidDataException("Invalid app library entry.");
             var crop = app.Crop;
             if (crop != null && (crop.Length != 4 || !Array.TrueForAll(crop, float.IsFinite)

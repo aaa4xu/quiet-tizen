@@ -11,7 +11,9 @@ so order the entries accordingly.
 
 Copy `launcher/assets/apps.json` to the ignored
 `launcher/assets/apps.local.json` to customize it. Entries contain a name,
-native app ID, local asset path, fit mode, background and source dimensions.
+native app ID, local asset path, fit mode (`cover`, `contain` or
+`contain-full`), background (`#RRGGBB`) and source dimensions. Quiet Home
+shows an error instead of the apps if any entry breaks these rules.
 Optional normalized `Crop` values are `[x,y,width,height]`. Paths must stay
 within the resource directory. The “Get more apps” utility tile draws a
 centered plus symbol; its regular caption remains below the card.

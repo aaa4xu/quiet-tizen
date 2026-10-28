@@ -31,11 +31,18 @@ public class AppCatalogTests
         Assert.True(apps.Count >= 2, "Catalog unexpectedly small");
     }
 
-    /// <summary>A path out of the catalog folder, a crop outside the image and a duplicate ID are each rejected.</summary>
+    /// <summary>
+    /// A path out of the catalog folder, a crop outside the image, a duplicate ID, a color that
+    /// is not "#RRGGBB" and an unknown fit are each rejected.
+    /// </summary>
     [Theory]
     [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"../escape.svg\",\"Width\":100,\"Height\":50}]")]
     [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Crop\":[0.8,0,0.4,1]}]")]
     [InlineData("[{\"Name\":\"A\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50},{\"Name\":\"B\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50}]")]
+    [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Background\":\"#FFF\"}]")]
+    [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Background\":\"red\"}]")]
+    [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Fit\":\"fill\"}]")]
+    [InlineData("[{\"Name\":\"Bad\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Fit\":null}]")]
     public void InvalidCatalogIsRejected(string json)
     {
         string path = Path.GetTempFileName();
@@ -68,4 +75,22 @@ public class AppCatalogTests
         Assert.Equal(new[] { "one" }, AppCatalog.DockApps(apps).ConvertAll(a => a.Id));
     }
 
+    /// <summary>The three fits and any "#RRGGBB" color, in either case, are accepted.</summary>
+    [Theory]
+    [InlineData("cover", "#1a2B3c")]
+    [InlineData("contain", "#000000")]
+    [InlineData("contain-full", "#FFFFFF")]
+    public void ValidFitsAndColors(string fit, string background)
+    {
+        string path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "[{\"Name\":\"A\",\"Id\":\"one\",\"Asset\":\"ok.svg\",\"Width\":100,\"Height\":50,\"Fit\":\"" + fit + "\",\"Background\":\"" + background + "\"}]");
+            Assert.Single(AppCatalog.Load(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
