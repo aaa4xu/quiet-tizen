@@ -41,6 +41,8 @@ if [ -d "$D/home-native-image" ]; then
     test ! -e "$A/bin/.native_image"
     cp -a "$D/home-native-image" "$A/bin/.native_image"
 fi
+# The package ships no res/quiet-home; removing it lets snapshot.sh and install-launcher.sh run again.
+rm -rf "$A/res/quiet-home"
 sqlite3 -bail /opt/dbspace/.pkgmgr_parser.db <<SQL
 ATTACH '$D/.pkgmgr_parser.db' AS before;
 BEGIN IMMEDIATE;
@@ -56,4 +58,4 @@ DROP TABLE guard;
 COMMIT;
 SQL
 app_launcher -u 5001 -s "$home"
-echo 'Original launcher routing and assembly restored. Extra Quiet Home resources remain inert for recovery.'
+echo 'Original launcher routing, assembly and resources restored.'

@@ -97,6 +97,7 @@ class ContainerBackupTests(unittest.TestCase):
         install = self.recipe("install-launcher.sh")
         first_change = install.index('mkdir "$S/unpacked"')
         for check in ('sha256sum -c "$D/original-assembly.sha256"', 'test -s "$original.tar.gz"',
+                      'test ! -e "$D/installed-home.sha256"',
                       'mode=$(cut -d \' \' -f 1 "$D/original-metadata.txt")'):
             self.assertLess(install.index(check), first_change)
         self.assertNotIn('cp -a "$A"', install)  # the snapshot owns the backup

@@ -28,12 +28,14 @@ test "$(stat -c %u:%g "$A/bin/$dll")" = 201:0
 test -s "$original/bin/$dll"
 test -s "$original.tar.gz"
 sha256sum -c "$D/original-assembly.sha256"
-test "$(sha256sum "$A/bin/$dll" | cut -d ' ' -f 1)" = "$(cut -d ' ' -f 1 "$D/original-assembly.sha256")"
+test "$(sha256sum "$A/bin/$dll" | cut -d ' ' -f 1)" = "$(cut -d ' ' -f 1 "$D/original-assembly.sha256")" || { echo "$dll is not the original the snapshot saved" >&2; exit 1; }
 mode=$(cut -d ' ' -f 1 "$D/original-metadata.txt")
 case "$mode" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) exit 1;; esac
 # First install only; do not silently overwrite an existing custom launcher.
 test ! -e "$A/res/quiet-home" || { echo 'Quiet Home is already installed in this container' >&2; exit 1; }
-test ! -e "$S/unpacked"
+# One install per snapshot: a second one would overwrite its records and nest the native image.
+test ! -e "$D/installed-home.sha256" || { echo 'This snapshot was already used for an install; take a new one' >&2; exit 1; }
+test ! -e "$S/unpacked" || { echo "Remove $S/unpacked left by an earlier install first" >&2; exit 1; }
 # One registry row for the container, live and in the snapshot, before touching the package.
 for db in /opt/dbspace/.pkgmgr_parser.db "$D/.pkgmgr_parser.db"; do
     test "$(sqlite3 -readonly "$db" "SELECT count(*) FROM package_app_info WHERE app_id='$container';")" = 1

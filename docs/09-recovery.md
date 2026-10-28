@@ -78,9 +78,9 @@ original assembly/cache and restores its selected registry flags. When the
 snapshot recorded the original DLL's digest, the recipe checks the saved copy
 against it before changing anything; if it does not match, recover the copy
 from `.local/` instead of restoring a damaged one.
-Extra Quiet Home resources are left inert for inspection/recovery; they are
-not a running background service. Removing them is optional after successful
-restoration.
+It then removes Quiet Home's `res/quiet-home` from the container, so a new
+snapshot can back up the original container and Quiet Home can be installed
+again. Each install needs its own snapshot.
 
 Allow temporary root cleanup to finish, then restart and test picture,
 sound, HDMI, Home, settings and remote. Restore only the optional cleanup
