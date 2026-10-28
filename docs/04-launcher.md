@@ -120,7 +120,18 @@ tv pull /opt/usr/share/quiet-tizen-backups/home-01/bixby-promotion-original.tar.
 
 `tv pull` stops on a file it cannot transfer in one session. In that case
 pull at least the original entry DLL from the copy's `bin/` folder and the
-`original-assembly.sha256` and `original-metadata.txt` records.
+`original-assembly.sha256` and `original-metadata.txt` records. On the
+QE65S95F the AdPlayer archive is about 1.3 MB, above the transfer limit, so
+only this fallback applies there:
+
+```sh
+tv pull /opt/usr/share/quiet-tizen-backups/home-01/adplayer-original/bin/AdPlayer.dll \
+  .local/home-01/AdPlayer.dll
+tv pull /opt/usr/share/quiet-tizen-backups/home-01/original-assembly.sha256 \
+  .local/home-01/original-assembly.sha256
+tv pull /opt/usr/share/quiet-tizen-backups/home-01/original-metadata.txt \
+  .local/home-01/original-metadata.txt
+```
 
 The new release recipes are a generalized form of the operations used on the
 original TV. Filesystem steps are not a single atomic transaction. If a step
