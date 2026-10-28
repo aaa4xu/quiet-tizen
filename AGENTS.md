@@ -75,7 +75,8 @@ Quiet Home's C# (`launcher/core`, `tests/QuietHome.Core.Tests` and
 sees only that file, including an agent on a much simpler model. The core holds
 the behaviour (`HomeController`, page models, ports); `launcher/tizen` only
 wires the app, implements the ports (`Platform`, `Interop`) and draws with NUI
-(`Views`).
+(`Views`). See "How the code is organized" in docs/04-launcher.md for the
+layout and where a new tile, action or page goes.
 
 - Every class, struct, interface and enum has a `///` comment on its place in
   the app's architecture: its layer (core logic, platform port, Tizen
@@ -104,5 +105,8 @@ reproduction examples in reports.
 When changing SQL generators, test apply/restore round trips and concurrent
 state drift with synthetic databases. When changing NUI code, compile against
 matching private references and validate on a compatible TV before claiming
-the new build was tested there. App navigation tests can run without Samsung
-references. Keep all third-party license notices and provenance.
+the new build was tested there. Quiet Home's behaviour is tested without
+Samsung references (`dotnet test tests/QuietHome.Core.Tests`). Give each
+behaviour change a remote-control scenario in `Scenarios/`; those tests
+cannot check what NUI draws. Keep all third-party license notices and
+provenance.

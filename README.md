@@ -135,8 +135,8 @@ python3 tools/build.py payloads
 python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
-GitHub Actions runs the offline tests and builds the open-source access
-payloads and app-catalog tests. The NUI launcher build needs Samsung reference
+GitHub Actions runs the offline tests, builds the open-source access
+payloads and tests Quiet Home's behaviour without Samsung references. The NUI launcher build needs Samsung reference
 assemblies and is deliberately not built from redistributed SDK files.
 
 ## Credits

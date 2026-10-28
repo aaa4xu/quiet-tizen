@@ -152,14 +152,8 @@ Verify visibly:
 - Chosen app shortcuts launch the correct installed apps.
 - The Controllers shortcut reaches the Bluetooth device list.
 
-The `build_ms` value in `/tmp/quiet-home-state.txt` measures how long the view
-takes to build a page's NUI objects, not input-to-photon latency or complete
-rendering time. It does not include reading the TV's settings or input list:
-the settings are read before the page is built, and the input list is read once per event (start, resume,
-window focus, the TV's change callback, a Home request and arriving at the
-Home page) and kept, and the Home page is built from the kept list. Values
-from builds before this change also counted `get_source_list()` and are not
-comparable.
+Quiet Home writes what it is doing to `/tmp/quiet-home-state.txt`; see
+[the diagnostics file](#the-diagnostics-file) for what its values mean.
 
 To see what the TV draws without a camera, Probe can capture the UI layer
 with `efl_util_screenshot` and write it as a PNG small enough for `tv pull`:
@@ -347,3 +341,163 @@ There is no always-running controller-poll loop. The 180 ms repeat filter
 applies inside Quiet Home only; changing it cannot fix input lag inside Netflix.
 Local diagnostic files retain only current launcher state and are overwritten;
 the launcher has no telemetry/network client.
+
+## How the code is organized
+
+Quiet Home's source has two layers, and `launcher/tizen/Home.csproj`
+compiles both into the one entry assembly the profile names. The package
+layout does not change: one DLL and `res/quiet-home`.
+
+- **`launcher/core`** (`QuietHome.Core`) holds the behaviour and has no
+  Tizen references:
+  - `HomeController` keeps the state (page, focus, inputs, catalog,
+    settings, theme, demo mode). It handles the app's life cycle and the
+    remote, acts through the ports and shows the result through the view
+    port. Errors become a notice on screen.
+  - `Navigation/` moves the focus. `Navigator` turns a key into a
+    `KeyOutcome`, and `KeyRepeatFilter` drops held-key repeats that come
+    within 180 ms.
+  - `Screens/` describes what is on screen. `ScreenBuilder` turns the state
+    into a `HomeScreen`: a `ChromeModel` (title, tabs, toolbar, bottom lines)
+    and one `PageModel` per page. `IHomeView` is the port the view
+    implements.
+  - `Platform/` holds the ports to the TV: `IInputSources`,
+    `IQuickSettings`, `IThemeStore`, `IClock`, `ISystemLauncher` and
+    `IDiagnostics`, passed together as `HomePorts`. `Platform/Demo/` holds
+    the in-memory versions that demo mode puts in front of them.
+  - `Actions/HomeAction` lists what Select on a card can do.
+    `Settings/SettingsTile` is the table of Settings tiles, and
+    `QuickSettingsState` holds the values read from the TV. `Catalog/`,
+    `Inputs/`, `Theme/` and `Diagnostics/` cover the app catalog, input
+    cards, colors and the diagnostics file.
+- **`launcher/tizen`** is the TV host:
+  - `QuietHomeApplication` creates the ports, the view and the controller,
+    and forwards Tizen's events to the controller. `KeyNames` maps the TV's
+    key names to remote keys.
+  - `Platform/` implements the ports with the P/Invoke declarations in
+    `Interop/`.
+  - `Views/` draws a `HomeScreen` with NUI. `HomeView` draws the chrome,
+    focus and notice, and one view per page draws that page's content.
+    `Layout` holds the coordinates and sizes, and `ArtworkCache` keeps app
+    art loaded.
+
+`QuickLaunch.cs` (the settings bridge) and `launcher/probe` are separate
+assemblies outside these layers. Keep them byte-identical: the bridge has no
+update path.
+
+A key press goes through these steps:
+
+1. The host passes the key to `HomeController.Key`.
+2. The repeat filter and `Navigator.HandleKey` decide the outcome: move the
+   focus, change the page, adjust a value or activate the focused card.
+3. To activate the card, the controller performs that card's `HomeAction`
+   through a port.
+4. The controller rebuilds the `HomeScreen` and passes it to
+   `IHomeView.Render`. The mode is `Rebuild` for a new page, `Refresh` for
+   new values and `AnimateFocus` for a focus move.
+5. The controller rewrites the diagnostics file.
+
+### Where to add things
+
+- **A Settings tile.** The Settings page is a 4 × 2 grid with every place
+  taken, so a new tile replaces an existing one. A bigger grid also needs
+  `Layout`, `SettingsPageView` and the Settings column handling in
+  `Navigator` changed. To add the tile:
+  - add a line to `SettingsTile.All` and its big line to
+    `SettingsTile.ValueText`;
+  - add the icon `launcher/assets/quick-ICON.svg`;
+  - if the tile shows a TV setting, add the setting's ID to
+    `QuickSettingsState.TvSettingIds` and a sample value to
+    `DemoQuickSettings`, which supplies demo mode's values.
+- **An action.** Add a record to `HomeAction` and a case to
+  `HomeController.Activate`. To open another Samsung screen or app, a
+  `LaunchRequest` is usually enough. Anything else that changes the TV
+  needs:
+  - a method on a port;
+  - its Tizen implementation in `launcher/tizen/Platform`;
+  - a version in `Platform/Demo` if demo mode must leave the TV unchanged;
+  - the same method on the test stand-in `FakeTv`.
+- **A page.** Changes are needed in several places:
+  - the core: the `Page` enum (its number is `page=` in the diagnostics
+    file), `ChromeModel.TabNames`, a `PageModel` record, `ScreenBuilder`
+    (title, content, toolbar button) and `quiet_page` in `LaunchOptions`;
+  - `Navigator.MoveSideways`, which assumes three tabs;
+  - the host: the tab positions in `Layout`, a page view in
+    `launcher/tizen/Views` and a case in `HomeView`;
+  - the page lists in `recipes/readme-screens.sh` and `tools/screens.py`.
+
+Add a scenario test for every new behaviour (see below). Keep
+the comment rule in [AGENTS.md](../AGENTS.md#c-code): every type says where
+it sits in this structure, and every method says what it does.
+
+### Tests without the TV
+
+```sh
+dotnet test tests/QuietHome.Core.Tests
+dotnet format launcher/core/QuietHome.Core.csproj --verify-no-changes
+dotnet format tests/QuietHome.Core.Tests --verify-no-changes
+```
+
+The test project builds the core without Samsung references, so it runs on
+any computer and in CI. Unit tests sit in a folder named after the core
+folder they test. `Scenarios/` holds tests written as remote-control use.
+Each one runs on `Fakes/HomeHarness`, a real `HomeController` over two
+stand-ins:
+
+- `FakeTv` implements every port in memory and records what was switched,
+  written and launched;
+- `FakeView` records each render, notice and clock text.
+
+```csharp
+home.Tv.Locked.Add("brightness");
+home.Open();
+home.Launch(("quiet_page", "settings"));
+home.Press(RemoteKey.Right, RemoteKey.Select);
+Assert.Equal("Brightness is unavailable for the current input.", home.View.Notice);
+```
+
+These tests cannot see what NUI draws. Layout, colors, fonts and artwork are
+checked only on the TV: by the demo frames and with the remote.
+
+### The diagnostics file
+
+Quiet Home rewrites `/tmp/quiet-home-state.txt` after every event. The file
+holds the page and focus, the last activity and key, the inputs, the catalog
+and artwork counters and the quick-setting values. Its keys and their order
+are a contract for the recipes and tools that read it.
+
+`build_ms` measures how long the view takes to build a page's NUI objects. It
+does not measure input-to-photon latency or the complete rendering time. It
+also leaves out reading the TV's settings and input list. The settings are
+read before the page is built. The input list is read once per event and
+kept: start, resume, window focus, the TV's change callback, a Home request
+and arriving at the Home page. The Home page is built from that kept list.
+Builds from before the input list moved behind `IInputSources` also counted
+`get_source_list()`, so their values are not comparable.
+
+### Develop on the TV
+
+Build against the TV's framework once, then run one command per change in a
+window agreed with the owner:
+
+```sh
+python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
+  --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01 \
+  --keep 3 --compare .local/baseline/PREVIOUS
+```
+
+The demo frames are reproducible byte for byte. A change that should not
+alter what is drawn must therefore match the previous run's frames exactly. A
+visual change makes its own run the new baseline. Then check by hand with the
+remote what the frames do not show:
+
+- every page;
+- switching inputs, with picture and sound;
+- volume, brightness, Game Mode and the sleep timer;
+- the theme;
+- the Samsung settings tiles;
+- the app shortcuts;
+- the Home and Settings keys.
+
+To undo the change, roll it back with the command the run prints (see
+[Install a newer build](#install-a-newer-build)).

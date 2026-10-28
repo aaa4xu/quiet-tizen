@@ -17,7 +17,7 @@ app assemblies, SDK binaries, database snapshots or raw session logs.
 Review screenshots for viewing history, profile names and other personal
 information before sharing them.
 
-For local checks:
+For local checks (inside `nix develop` when you use Nix):
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -27,9 +27,20 @@ dotnet format launcher/core/QuietHome.Core.csproj --verify-no-changes
 dotnet format tests/QuietHome.Core.Tests --verify-no-changes
 ```
 
-New or rewritten C# needs a comment on every class and interface explaining
-its place in the architecture, and on every method saying what it does; see
-"C# code" in AGENTS.md.
+CI runs the same checks. To fix the formatting, run `dotnet format` on
+the project without `--verify-no-changes`.
+
+For Quiet Home's code:
+
+- Read "How the code is organized" in
+  [docs/04-launcher.md](docs/04-launcher.md#how-the-code-is-organized). It
+  shows the layers and where a new Settings tile, action or page goes.
+- Put behaviour in `launcher/core`, behind the ports, not in the NUI views.
+- Add a scenario to `tests/QuietHome.Core.Tests/Scenarios` for each change in
+  what the remote does.
+- New or rewritten C# needs a comment on every class and interface
+  explaining its place in the architecture, and on every method saying what
+  it does; see "C# code" in AGENTS.md.
 
 NUI changes also need a build against matching private references and a
 clearly stated hardware-test status. Keep attribution/license files with
