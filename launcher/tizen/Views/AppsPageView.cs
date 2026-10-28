@@ -34,12 +34,12 @@ static class AppsPageView
         int column = appCard.Index % 5, row = appCard.Index / 5;
         int x = Layout.Margin + column * Layout.AppColumnStep, y = Layout.AppTop + row * Layout.AppRowStep;
         int w = Layout.AppWidth, h = Layout.AppHeight;
-        var shadow = scene.Panel(x - 5, y + 7, w + 10, h + 8, ViewPalette.AppShadow(), 22);
+        var shadow = scene.Panel(x - 5, y + 7, w + 10, h + 8, ViewPalette.AppShadow(), Layout.CardRadius + 4);
         var color = app.Utility && palette.Dark ? ViewPalette.DarkUtilityCard() : ViewPalette.FromHex(app.Background);
-        var card = scene.Card(x + w / 2, y + h / 2, w, h, color, 18);
+        var card = scene.Card(x + w / 2, y + h / 2, w, h, color, Layout.CardRadius);
         if (AppArtwork.Fill(card, app, w, h, canvas.Artwork, palette))
             canvas.ColdArtwork++;
-        var ring = FocusStyle.AddRing(card, w, h, 18, palette.Ink);
+        var ring = FocusStyle.AddRing(card, w, h, Layout.CardRadius, palette.Ink);
         scene.Text(app.Name, new Box(x, y + h + Layout.AppNameGap, w, Layout.AppNameHeight), Layout.AppNameSize, palette.Ink);
         canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Shadow = shadow, Ring = ring });
     }

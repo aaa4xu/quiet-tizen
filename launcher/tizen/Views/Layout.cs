@@ -166,6 +166,13 @@ static class Layout
     /// <summary>Font sizes of the tile's title, value and hint.</summary>
     public const float TileTitleSize = 29, TileValueSize = 38, TileHintSize = 20;
 
+    /// <summary>
+    /// Corner radius of every rectangular card (input, app, dock and Settings cards) and of
+    /// app artwork that fills its card. The Settings tile and dock artwork files are drawn
+    /// with the same radius. The focus ring's corners follow it (see <see cref="FocusStyle.AddRing"/>).
+    /// </summary>
+    public const int CardRadius = 24;
+
     /// <summary>Size of a toolbar button.</summary>
     public const int ToolbarSize = 68;
 

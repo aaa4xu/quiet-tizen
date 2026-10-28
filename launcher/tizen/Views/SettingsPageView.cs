@@ -19,13 +19,13 @@ static class SettingsPageView
             var tile = model.Tile;
             int w = Layout.TileWidth, h = Layout.TileHeight;
             int x = Layout.Margin + tile.Column * Layout.TileColumnStep, y = Layout.TileTop + tile.Row * Layout.TileRowStep;
-            var card = canvas.Scene.Card(x + w / 2, y + h / 2, w, h, ViewPalette.Clear(), 24);
+            var card = canvas.Scene.Card(x + w / 2, y + h / 2, w, h, ViewPalette.Clear(), Layout.CardRadius);
             card.Add(new ImageView { ResourceUrl = canvas.Root + "quick-" + tile.Icon + ".svg", Size2D = new Size2D(w, h) });
             card.Add(Scene.Label(tile.Title, Layout.TileTitle, Layout.TileTitleSize, ViewPalette.White(), "Semibold"));
             var value = Scene.Label("", Layout.TileValue, Layout.TileValueSize, ViewPalette.White(), "Display");
             card.Add(value);
             card.Add(Scene.Label(tile.Hint, Layout.TileHint, Layout.TileHintSize, ViewPalette.TileHint()));
-            var ring = FocusStyle.AddRing(card, w, h, 24, canvas.Palette.Ink);
+            var ring = FocusStyle.AddRing(card, w, h, Layout.CardRadius, canvas.Palette.Ink);
             canvas.Slots.Add(new SlotView(card, new Box(x, y, w, h)) { Ring = ring, Value = value });
         }
     }

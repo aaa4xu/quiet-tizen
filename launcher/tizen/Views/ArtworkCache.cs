@@ -175,7 +175,7 @@ sealed class ArtworkCache
             iw = (int)Math.Min(w, Math.Round(h * aspect));
             ih = (int)Math.Min(h, Math.Round(w / aspect));
         }
-        float radius = iw == w && ih == h ? 18 : 0;
+        float radius = iw == w && ih == h ? Layout.CardRadius : 0;
         var image = new ImageView
         {
             Position2D = new Position2D((w - iw) / 2, (h - ih) / 2),
