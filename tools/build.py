@@ -23,7 +23,8 @@ def main():
         for name in ("SamsungTvArchiveRoot", "SamsungTvRootAgent"):
             jobs.append((ROOT / f"vendor/payload-source/{name}.csproj", "payloads", name, []))
     if args.target in ("launcher", "all"):
-        for name in ("Tizen.NUI", "Tizen.Applications.Common", "Tizen.System", "Tizen"):
+        for name in ("Tizen.NUI", "Tizen.Applications.Common", "Tizen.System", "Tizen",
+                     "Tizen.TV.NUI", "Tizen.TV.Broadcast.TVService"):
             if not (args.framework / f"{name}.dll").is_file():
                 parser.error(f"Missing {name}.dll. Read docs/04-launcher.md; these are not bundled.")
         launcher = json.loads(args.profile.read_text(encoding="utf-8"))["launcher"]

@@ -12,5 +12,7 @@
   <Reference Include="Tizen.Applications.Common"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.Applications.Common.dll</HintPath><Private>false</Private></Reference>
   <Reference Include="Tizen.System"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.System.dll</HintPath><Private>false</Private></Reference>
   <Reference Include="Tizen"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.NUI"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.NUI.dll</HintPath><Private>false</Private></Reference>
+  <Reference Include="Tizen.TV.Broadcast.TVService"><HintPath>$(TV_FRAMEWORK_DIR)/Tizen.TV.Broadcast.TVService.dll</HintPath><Private>false</Private></Reference>
  </ItemGroup>
 </Project>

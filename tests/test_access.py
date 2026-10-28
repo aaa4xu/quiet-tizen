@@ -158,15 +158,21 @@ class AccessTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             private_path(ROOT / ".local/../public-backup.json")
 
-    def test_framework_pull_plans_four_private_copies_and_never_replaces_one(self):
+    def test_framework_pull_plans_missing_private_copies_and_never_replaces_one(self):
         (ROOT / ".local").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".local") as directory:
             plan = framework_pull_plan("/usr/share/dotnet.tizen/framework", directory)
             self.assertEqual([remote for remote, _ in plan],
                              [f"/usr/share/dotnet.tizen/framework/{name}" for name in tv.FRAMEWORK])
+            self.assertIn("Tizen.TV.Broadcast.TVService.dll", tv.FRAMEWORK)
             self.assertEqual({local.parent for _, local in plan}, {Path(directory).resolve()})
             plan[2][1].write_bytes(b"earlier copy")
-            with self.assertRaisesRegex(ValueError, "Tizen.System.dll"):
+            rest = framework_pull_plan("/usr/share/dotnet.tizen/framework", directory)
+            self.assertNotIn("Tizen.System.dll", [local.name for _, local in rest])
+            self.assertEqual(len(rest), len(tv.FRAMEWORK) - 1)
+            for _, local in rest:
+                local.write_bytes(b"earlier copy")
+            with self.assertRaisesRegex(ValueError, "already"):
                 framework_pull_plan("/usr/share/dotnet.tizen/framework", directory)
         for source in ("usr/share/dotnet.tizen/framework", "/usr/share\n/framework"):
             with self.assertRaises(ValueError):

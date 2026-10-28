@@ -22,8 +22,10 @@ from samsung_tv_root.sdb import SdbClient, find_sdb
 PROFILES = [json.loads(path.read_text(encoding="utf-8")) for path in sorted((ROOT / "profiles").glob("*.json"))]
 STAGE = "/home/owner/share/tmp/sdk_tools/quiet-tizen"
 AGENT_COMMAND_LIMIT = 64 * 1024  # MaximumCommandBytes in the TV-side root agent
-# The four private references tools/build.py compiles Quiet Home against.
-FRAMEWORK = ("Tizen.NUI.dll", "Tizen.Applications.Common.dll", "Tizen.System.dll", "Tizen.dll")
+# The private references tools/build.py compiles Quiet Home against; the last two are the
+# TV service behind the input preview (docs/12-hdmi-preview.md).
+FRAMEWORK = ("Tizen.NUI.dll", "Tizen.Applications.Common.dll", "Tizen.System.dll", "Tizen.dll",
+             "Tizen.TV.NUI.dll", "Tizen.TV.Broadcast.TVService.dll")
 FRAMEWORK_DIR = "/usr/share/dotnet.tizen/framework"
 
 
@@ -126,14 +128,18 @@ base64 "$t"
 
 
 def framework_pull_plan(source, destination):
-    """Pair each reference's TV path with its private copy; never replace an earlier copy."""
+    """Pair each missing reference's TV path with its private copy; never replace an earlier copy.
+
+    A checkout that already has some references (for example from before the preview needed
+    the TV service) pulls only the rest.
+    """
     if not source.startswith("/") or "\0" in source or "\n" in source:
         raise ValueError("Use an absolute, single-line TV directory.")
     plan = [(str(PurePosixPath(source) / name), private_path(Path(destination) / name)) for name in FRAMEWORK]
-    existing = [str(local) for _, local in plan if local.exists()]
-    if existing:
-        raise ValueError(f"Already pulled: {', '.join(existing)}. Inspect and move them aside first.")
-    return plan
+    missing = [(remote, local) for remote, local in plan if not local.exists()]
+    if not missing:
+        raise ValueError(f"All references are already in {destination}. Inspect and move them aside to pull again.")
+    return missing
 
 
 def decode_pull(stdout):
@@ -166,10 +172,10 @@ def main():
     pull = sub.add_parser("pull", help="Read and verify one bounded file into ignored .local/")
     pull.add_argument("remote")
     pull.add_argument("local", type=Path)
-    framework = sub.add_parser("framework-pull", help="Read and verify the four Tizen reference "
+    framework = sub.add_parser("framework-pull", help="Read and verify the Tizen reference "
                                "assemblies the launcher build needs into ignored .local/")
     framework.add_argument("--from", dest="source", default=FRAMEWORK_DIR,
-                           help="TV directory holding all four; check it with find first")
+                           help="TV directory holding all of them; check it with find first")
     framework.add_argument("--to", dest="destination", type=Path, default=ROOT / ".local/tv-framework",
                            help="Private directory inside .local/ for the copies")
     push = sub.add_parser("push", help="Upload one file to the SDK staging directory, not to system paths")
