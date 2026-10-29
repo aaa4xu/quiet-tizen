@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using QuietHome.Core.Platform;
+using QuietHome.TizenHost.Interop;
 using QuietHome.TizenHost.Views;
 
 namespace QuietHome.TizenHost.Platform;
@@ -14,7 +15,9 @@ namespace QuietHome.TizenHost.Platform;
 /// the QE65S95F whenever the window's transparency changed, which <see cref="HomeView"/>
 /// therefore sets once), so every reset it reports is undone at once, and after tying the
 /// plane to the window the hole opens only once the size has held: the owner sees the
-/// picture appear in its card, not a reset.
+/// picture appear in its card, not a reset. Before an input opens it closes the hole and
+/// covers the TV's viewer with the window, and gives the picture back to the viewer only once
+/// a frame without the hole was drawn and the viewer has paused (see HandToViewer).
 /// </summary>
 sealed class TizenInputPreview : IInputPreview, IDisposable
 {
@@ -32,10 +35,16 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     // the full-screen picture through a hole that is still open.
     const int CloseFrameMs = 40;
 
+    // How often, and at most how long, Quiet Home checks whether the viewer below has paused.
+    const int ViewerPollMs = 20;
+    const int ViewerWaitMs = 1000;
+
     readonly HomeView view;
     readonly Tizen.NUI.Timer timer = new(SettleMs);
     readonly Tizen.NUI.Timer steady = new(SteadyMs);
     readonly Tizen.NUI.Timer closing = new(CloseFrameMs);
+    readonly Tizen.NUI.Timer viewerPoll = new(ViewerPollMs);
+    readonly System.Diagnostics.Stopwatch handWatch = new();
     TvVideoPlane? plane;
     Box heldRect;
     int repairs;
@@ -45,6 +54,10 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     bool touched;
     // Set while the input's sound is muted by Quiet Home, so a release unmutes only what it muted.
     bool silenced;
+    // Set while the window covers the TV's viewer (see HandToViewer).
+    bool covered;
+    // The input's opening, run once the covered viewer has paused (see HandToViewer).
+    Action? opening;
 
     /// <summary>Creates the port for the cards drawn by <paramref name="view"/>.</summary>
     public TizenInputPreview(HomeView view)
@@ -65,6 +78,7 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
             Restore(false);
             return false;
         };
+        viewerPoll.Tick += (s, e) => !ViewerPolled();
     }
 
     /// <summary>Raised when the TV refused the preview; the picture is already back to normal.</summary>
@@ -77,6 +91,7 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     /// </summary>
     public void Show(int sourceType, int slot)
     {
+        Uncover();
         if (slot == wantedSlot && (timer.IsRunning() || steady.IsRunning() || view.HoleOpen(slot)))
             return;
         wantedSlot = slot;
@@ -103,9 +118,21 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     /// <summary>
     /// Quiet Home gives the screen up: the hole closes and the TV gets its full-screen
     /// picture back at once, before an input switch could keep the preview's size, and with
-    /// <paramref name="sound"/> the input's sound if Quiet Home muted it.
+    /// <paramref name="sound"/> the input's sound if Quiet Home muted it. A window that
+    /// <see cref="HandToViewer"/> covered is uncovered: Quiet Home is going to the background
+    /// behind the opened input, so the viewer stays resumed when Quiet Home comes back.
     /// </summary>
     public void Release(bool sound)
+    {
+        GiveBack(sound);
+        Uncover();
+    }
+
+    /// <summary>
+    /// Ends any preview and gives the TV its full-screen picture back, and with
+    /// <paramref name="sound"/> the input's sound; the window stays as it is.
+    /// </summary>
+    void GiveBack(bool sound)
     {
         Forget();
         if (touched || closing.IsRunning())
@@ -114,7 +141,14 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
             touched = false;
             Restore(true);
         }
-        if (!sound || !silenced)
+        if (sound)
+            Unsilence();
+    }
+
+    /// <summary>Turns the input's sound back on if Quiet Home muted it.</summary>
+    void Unsilence()
+    {
+        if (!silenced)
             return;
         silenced = false;
         try
@@ -124,6 +158,97 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
         catch (Exception)
         {
             // Nothing more can be done here.
+        }
+    }
+
+    /// <summary>
+    /// Quiet Home opens an input: ends the preview, closes the hole and covers the TV's
+    /// viewer with the window at once. Once a frame without the hole was drawn
+    /// (<see cref="CloseFrameMs"/>) and the viewer reports that it paused, or after
+    /// <see cref="ViewerWaitMs"/>, it gives picture and sound back and runs
+    /// <paramref name="open"/>. Until then the plane keeps the card's size, so no frame shows
+    /// a full-screen picture through the hole. The window stays covered until Quiet Home goes
+    /// to the background (<see cref="Release"/>) or previews again (<see cref="Show"/>): a
+    /// viewer that resumes from a pause under Quiet Home turns the input's sound back on.
+    /// Without the viewer's state (another firmware) it waits only for the frame.
+    /// </summary>
+    public void HandToViewer(Action open)
+    {
+        Forget();
+        viewerPoll.Stop();
+        opening = open;
+        if (ViewerState() != null)
+            Cover();
+        handWatch.Restart();
+        viewerPoll.Start();
+    }
+
+    /// <summary>
+    /// Checks the wait of <see cref="HandToViewer"/>; returns whether it is over and the input
+    /// was opened.
+    /// </summary>
+    bool ViewerPolled()
+    {
+        long waited = handWatch.ElapsedMilliseconds;
+        if (waited < CloseFrameMs)
+            return false;
+        string? state = ViewerState();
+        if (state != null && state != "pause" && waited < ViewerWaitMs)
+            return false;
+        Note($"viewer {state ?? "unknown"} after {waited} ms");
+        GiveBack(true);
+        Open();
+        return true;
+    }
+
+    /// <summary>Runs the pending opening of an input, once.</summary>
+    void Open()
+    {
+        var run = opening;
+        opening = null;
+        run?.Invoke();
+    }
+
+    /// <summary>Covers the TV's viewer with the window, so the viewer pauses.</summary>
+    void Cover()
+    {
+        try
+        {
+            view.Cover(true);
+            covered = true;
+        }
+        catch (Exception)
+        {
+            // An older window system without the opaque state: the input opens uncovered.
+        }
+    }
+
+    /// <summary>Lets the picture below the window show again, if <see cref="HandToViewer"/> covered it.</summary>
+    void Uncover()
+    {
+        if (!covered)
+            return;
+        covered = false;
+        try
+        {
+            view.Cover(false);
+        }
+        catch (Exception)
+        {
+            // Without the opaque state the window was never covered.
+        }
+    }
+
+    /// <summary>Returns the TV viewer's state from vconf ("pause", "resume_focus", ...), or null when it cannot be read.</summary>
+    static string? ViewerState()
+    {
+        try
+        {
+            return Vconf.GetString(Vconf.ViewerStateKey);
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 
@@ -148,6 +273,7 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
         timer.Dispose();
         steady.Dispose();
         closing.Dispose();
+        viewerPoll.Dispose();
         try
         {
             DisposePlane();
@@ -250,8 +376,8 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     }
 
     /// <summary>
-    /// Gives the TV its full-screen picture back; with <paramref name="confirm"/> it waits
-    /// until the TV has untied the plane (see <see cref="TvVideoPlane.Reset"/>).
+    /// Gives the TV's viewer its full-screen picture back; with <paramref name="confirm"/> it
+    /// waits for an untie when the viewer's window is unknown (see <see cref="TvVideoPlane.Reset"/>).
     /// </summary>
     void Restore(bool confirm)
     {
@@ -298,6 +424,23 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     /// <summary>Gives the TV its full-screen picture back, waiting for the untie with <paramref name="confirm"/>.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     void ResetPlane(bool confirm) => plane?.Reset(confirm);
+
+    /// <summary>Adds <paramref name="line"/> to the preview record; never throws.</summary>
+    static void Note(string line)
+    {
+        try
+        {
+            NoteOnPlane(line);
+        }
+        catch (Exception)
+        {
+            // The record is only for diagnosis.
+        }
+    }
+
+    /// <summary>Adds <paramref name="line"/> to the record <see cref="TvVideoPlane"/> keeps.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void NoteOnPlane(string line) => TvVideoPlane.Log(line);
 
     /// <summary>Returns whether the TV is playing the input on screen.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]

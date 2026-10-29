@@ -58,19 +58,30 @@ def main():
         run("exec", "--command",
             f"rm -rf {REMOTE} {REMOTE}.tar && mkdir {REMOTE} && /usr/bin/dotnet {STAGING}/Frame.dll {REMOTE} 2>/dev/null"
             f" | grep -E '^(ui|video)='; cp /tmp/quiet-home-state.txt {REMOTE}/state 2>/dev/null || : > {REMOTE}/state;"
-            f" tar -C {REMOTE} -cf {REMOTE}.tar {' '.join(layers)}")
+            f" cd {REMOTE} && tar -cf {REMOTE}.tar $(ls {' '.join(layers)} 2>/dev/null)")
         run("pull", f"{REMOTE}.tar", str(archive))
     finally:
         run("exec", "--command", f"rm -rf {REMOTE} {REMOTE}.tar {STAGING}/Frame.dll")
     with tarfile.open(archive) as files:
+        names = files.getnames()
         for name, local in layers.items():
-            local.write_bytes(files.extractfile(name).read())
+            local.unlink(missing_ok=True)
+            if name in names:
+                local.write_bytes(files.extractfile(name).read())
     archive.unlink()
+    if not layers["ui.png"].exists():
+        sys.exit("The TV returned no UI layer.")
 
     # Only the composition needs Pillow.
     from PIL import Image, ImageStat
     ui = Image.open(layers["ui.png"]).convert("RGBA")
-    video = Image.open(layers["video.png"]).convert("RGB")
+    # The video call fails (-1, -4) while the input is HDCP 2.x protected, as the PlayStation 5's
+    # 4K picture was; the UI then lies over black, and its see-through parts show as black.
+    if layers["video.png"].exists():
+        video = Image.open(layers["video.png"]).convert("RGB")
+    else:
+        print("The TV returned no video layer; the picture under the UI is black.")
+        video = Image.new("RGB", ui.size)
     picture = Image.alpha_composite(video.resize(ui.size, Image.BILINEAR).convert("RGBA"), ui).convert("RGB")
     picture.save(out)
     print(f"{out}: UI {ui.width}x{ui.height} over video {video.width}x{video.height}")

@@ -216,6 +216,8 @@ its format says XRGB8888: 0 in the preview hole and 255 elsewhere. The tool
 also keeps both layers and the diagnostics file of that moment next to the
 PNG. A run takes four SDB sessions, about 40 seconds. A screen saver over the
 picture is captured too: the tool shows what is on screen and changes nothing.
+The video call refuses a picture under HDCP 2.x (the PlayStation 5's, -1 or
+-4); the tool then lays the UI over black and says so.
 
 The README screenshots come from Quiet Home's demo mode. A launch with the
 extra `quiet_demo=1` shows the public catalog (packaged as

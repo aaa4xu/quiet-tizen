@@ -143,12 +143,24 @@ TV's source or pipeline and, with it, the picture mode of the whole screen
 3. Cut a see-through hole the shape of the card into the window (below) once
    the size holds.
 4. When the focus leaves the card or the page changes, close the hole first,
-   then one frame later call `SetSize(0, 0, 1080, 1920)` and `SetXWindow(0)`.
-5. Before opening an input or app, do step 4 at once and wait 0.5 s after
-   `SetXWindow(0)` before the input switch. Mute the input's sound with
-   `IAVControl.MuteAudio(1)` while the launcher is in front and turn it back on
-   with `MuteAudio(0)` when an input opens or the launcher goes to the
-   background.
+   then one frame later call `SetSize(0, 0, 1080, 1920)` and give the plane
+   back to the TV viewer's window: `SetXWindow(viewerId)`, where `viewerId`
+   is the vconf key `db/tv-viewer/window_id`. That is where the plane stays
+   with Samsung's home, which never ties it. If the key cannot be read, call
+   `SetXWindow(0)` instead.
+5. Before opening an app or going to the background, do step 4 at once. Only
+   after `SetXWindow(0)` wait 0.5 s before the switch. While nothing is in
+   front of the launcher, ask for no preview, even when a notice redraws the
+   page.
+6. Before opening an input, close the hole and mark the window opaque
+   (`Window.SetOpaqueState(true)`) at once. Once a frame has drawn (40 ms)
+   and `memory/tv-viewer/viewer_state` reads `pause` (at most 1 s), give the
+   plane back as in step 4 and switch. Mark the window see-through again
+   when the launcher goes to the background behind the input, or before the
+   next preview if the switch failed.
+7. Mute the input's sound with `IAVControl.MuteAudio(1)` while the launcher is
+   in front and turn it back on with `MuteAudio(0)` when an input opens or the
+   launcher goes to the background.
 
 ## Findings on the QE65S95F
 
@@ -190,11 +202,84 @@ point says otherwise.
   input in the card's rectangle. `SetSize(0, 0, 1080, 1920)` and
   `SetXWindow(0)` before anything else changes the picture prevent that.
 - **Opening an input right after `SetXWindow(0)` gave a black picture with
-  sound.** So did leaving the plane tied to the launcher's window (as
-  Samsung's home does before the TV viewer). Waiting 0.5 s after
-  `SetXWindow(0)` before the switch fixed it. The TV sends no
-  `SignalXWindowChanged` for the untie, only when the viewer ties the plane
-  about 1 s later, so Quiet Home waits for the notice and times out.
+  sound.** Waiting 0.5 s after `SetXWindow(0)` before the switch fixed it on
+  28 October. The TV sends no `SignalXWindowChanged` for the untie, only when
+  the viewer ties the plane about 1 s later, so Quiet Home waited for the
+  notice and timed out.
+- **The viewer does not take the plane back by itself (29 October).** The
+  viewer stays resumed under the launcher (`memory/tv-viewer/viewer_state`
+  is `resume_unfocus`), so opening the input already on screen does not make
+  it tie the plane again, and only a real input change does. Two handovers
+  failed every time on the owner's TV:
+  - **Untied plane.** It showed nothing (the `VS::Subsurface` line in
+    `enlightenment_info -topvwins` reads `N`, `NO`).
+  - **Plane left tied to the launcher's window.** The picture went black
+    once that window was hidden, while the subsurface still read `V`, `VD`.
+    Sound stayed on. `IAVControl.MuteVideo(0)` brought the picture back, so
+    the TV had muted the video. Minutes later the TV started its screen saver
+    over the input, as it does over an app.
+
+  An earlier note said a plane tied to any window showed the picture. It
+  relied on the `VS::Subsurface` line, which does not tell a muted picture
+  apart, and the PlayStation's HDCP 2.x picture could not be captured to
+  check. With HDCP off on the console, `tools/frame.py` captured the video
+  plane:
+  - black (a 5.5 KB PNG) for the two handovers above;
+  - the console's menu once the plane was tied to the viewer's window.
+
+  The viewer publishes that window's resource id (1 on this TV) in vconf
+  under `db/tv-viewer/window_id`, a key named in `libtv-viewer-api.so`.
+  `SetXWindow` with it (from the root session, then from Quiet Home) gave the
+  picture each time and made the TV report `SignalXWindowChanged` with that
+  id. `IVideoControl.GetLastWindowId` returned -1 throughout and does not
+  report the tie.
+- **The screen saver needs the viewer to resume from a pause (29 October).**
+  The window system starts the screen saver after 120 s without a reset
+  (`enlightenment_info -scrsaver info`; `db/menu/system/auto_protection_time`
+  was 1). Over the PlayStation's still menu it started within 150 s when
+  the input was opened from Quiet Home, and also after a later
+  `connect_source` from the root session. The owner opened the same menu
+  from Samsung's home: no screen saver in 4 minutes. Under that opaque home
+  the viewer's state is `pause`; under the see-through launcher it stays
+  `resume_unfocus`. Launching the viewer from `pause` (`app_launcher -s
+  org.tizen.tv-viewer` after Smart Hub had covered it) gave no screen saver
+  in 160 s either. So Quiet Home marks its window opaque before opening an
+  input. The viewer reported `pause` 40 ms later; after the switch it tied
+  the plane to itself again (`window changed 1`).
+- **A paused viewer shows no preview and turns the sound on when it resumes
+  (29 October).** With the window opaque all the time the viewer stayed
+  paused under Quiet Home and the previewed card was black: the plane
+  captured as 5.5 KB even after `MuteVideo(0)`. Uncovering the window at the
+  next preview resumed the viewer, which turned the input's sound back on
+  although Quiet Home had muted it: the owner heard the input on Home after
+  coming from Settings, where the covered window had kept it silent. So the
+  window is uncovered when Quiet Home goes to the background behind the
+  opened input, after the viewer has resumed in front of it.
+- **Going full screen before the hole closed showed a stretched slice of the
+  picture in the card** for a moment, which the owner saw when opening the
+  previewed input. The plane now keeps the card's size until a frame without
+  the hole has drawn.
+- **Telling a black picture apart without looking.** The video capture refused
+  the PlayStation's 4K picture under HDCP 2.x (`IAVControl.GetResolution`
+  reported `hdcpType` 2) and worked once HDCP was off on the console. A black
+  plane captured as a 720 × 576 PNG of about 5.5 KB; the console's dimmed
+  menu, about 18 KB; its full menu, about 380 KB. `enlightenment_info
+  -topvwins` tells only an untied plane apart (`N`, `NO`), not a muted one.
+- **The TV's notices are handled in the background too.** Quiet Home listens
+  to the input list and CEC notices for its whole life. Until 29 October a
+  redraw they caused after an input opened (for example the console waking as
+  the TV switched to it) asked for a preview again, which would tie the plane
+  to the hidden launcher window under the opened input. This was found in the
+  code and its scenario test, not caught on screen. Quiet Home now asks for
+  none from the moment it opens an input or app until it is in front again.
+- **One Touch Play switches the input under the launcher.** The owner turned
+  the PlayStation on with its controller while Home previewed the PC: the TV
+  switched to the PlayStation, Quiet Home stayed in front, and the PC's card
+  showed the PlayStation. `memory/system/source_type` in vconf had changed to
+  the PlayStation's input, so Quiet Home rereads it on its input poll (every
+  1.5 s) and moves the wide card to the new input. The switch itself could not
+  be repeated without the controller: `connect_source` from a root session
+  made the TV open its viewer instead.
 - **Timing.** `SetSize` takes about 20–30 ms on the UI thread. Moving the plane
   every frame would stall the UI; Quiet Home places it once, after the card's
   focus animation. With these steps the picture appeared in its card about
@@ -259,12 +344,17 @@ The decision is in the core and the TV calls are in the host, as
   container's own manifest and Cynara privileges apply, so no new TPK is
   needed.
 - **Core.** `Platform/IInputPreview` has `Show(sourceType, slot)`, `Hide()`,
-  `Release(sound)`, `Silence()` and a `Failed` event. `HomeController` asks for
+  `Release(sound)`, `HandToViewer(open)`, `Silence()` and a `Failed` event. `HomeController` asks for
   a preview after every render while the card of the input on screen (other
   than Live TV) is shown wide on the Home page, outside demo mode: focused, or
   the card the Home tab leads to. It hides the preview on every other focus and
-  page change, releases the screen before an input or app opens and on `Pause`
-  and `Terminate`, and mutes the input when it comes to the front. After it
+  page change, hands the screen to the viewer before an input opens (the
+  switch runs once the port is done), releases it before an app opens and on
+  `Pause` and `Terminate`, and asks for no preview from
+  then until it is in front again. It mutes the input when it comes to the
+  front. While it is in front, its input poll and the TV's notices also reread
+  the input on screen; when the TV switched it, the focus on the input cards
+  moves to the new input's card. After it
   opened an app from the catalog it asks for no preview until an input is
   opened through it. After one
   refused call it stops asking until the app restarts. The diagnostics file
@@ -278,7 +368,11 @@ The decision is in the core and the TV calls are in the host, as
   once the size holds. `Layout.InputBox` widens the card to 786 × 442 and
   narrows the others; `HomePageView.Place` animates them, and the picture's
   rectangle is the card's, a few pixels larger, so its square corners stay
-  under the window. Every TV service call and size report is appended to
+  under the window. Hiding and releasing give the plane back to the viewer's
+  window read from vconf. Before an input opens, `HandToViewer` closes the
+  hole and marks the window opaque (`HomeView.Cover`), and gives the plane
+  back once the viewer has paused; `Release` (Quiet Home going to the
+  background) or the next preview uncovers it. Every TV service call and size report is appended to
   `/tmp/quiet-preview.txt` (it starts over past 64 KiB).
 - **Demo mode** never previews or mutes, so the demo frames show the cards as
   drawn.
@@ -292,14 +386,24 @@ Build against the TV's own assemblies and install the build as usual
 - Home with an HDMI input on screen: its card is wide and shows the input
   without sound; moving to the other cards changes no picture mode.
 - Select the card, and Back from Home: the input opens full screen with
-  picture and sound.
+  picture and sound; the card goes dark first, with no stretched slice of
+  the picture in it.
+- From an input, open Settings with the remote, then go to the Home tab: the
+  input stays silent on both pages.
 - From Settings or Apps to the Home tab: the card of the input on screen is
   wide with its preview; Down focuses it.
 - Open an app from the dock: no input sound while it starts.
 - Unplug the HDMI device, restart fully, standby and wake: no stale plane.
+- Open an input from its previewed card, from another card, and with Back
+  from the dock: the picture shows each time.
+- Turn a console on with its controller while Home previews another input:
+  the wide card moves to the console's card within two seconds.
+- Open an input from Quiet Home and leave it alone on a still picture for
+  five minutes: no screen saver starts over it. The log shows `viewer pause
+  after N ms` before the switch.
 - The preview cannot be seen in `efl_util_screenshot`; watch the screen, or
-  capture the video plane with `secvideo_api_capture_screen_video_only` from a
-  root session.
+  capture the video plane with `tools/frame.py` (not under HDCP 2.x). The log
+  shows `SetXWindow viewer N` and `window changed N` after each handover.
 
 ## Limits
 

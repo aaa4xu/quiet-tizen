@@ -126,12 +126,113 @@ public sealed class PreviewScenarios : IDisposable
         AssertReleasedBeforeLastSwitch();
     }
 
-    /// <summary>Checks that the TV got its picture and sound back right before the last input switch.</summary>
+    /// <summary>Checks that the TV's viewer got the picture and sound back right before the last input switch.</summary>
     void AssertReleasedBeforeLastSwitch()
     {
         int switched = home.Tv.Events.FindLastIndex(e => e.StartsWith("switch"));
-        Assert.True(switched > 0);
-        Assert.Equal("release+sound", home.Tv.Events[switched - 1]);
+        Assert.True(switched > 1);
+        Assert.Equal("release+sound", home.Tv.Events[switched - 2]);
+        Assert.Equal("viewer", home.Tv.Events[switched - 1]);
+    }
+
+    /// <summary>
+    /// While the port waits for the viewer before the switch, a notice that redraws the page
+    /// asks for no preview (its hole would open again); the input opens once the port goes on.
+    /// </summary>
+    [Fact]
+    public void NoPreviewWhileTheInputWaitsForTheViewer()
+    {
+        home.Open();
+        home.Tv.HoldViewer = true;
+        home.Press(RemoteKey.Select);
+        Assert.Empty(home.Tv.Switched);
+        int handed = home.Tv.Events.Count;
+        home.Tv.RaiseChanged();
+        home.Controller.PollInputs();
+        Assert.DoesNotContain(home.Tv.Events.GetRange(handed, home.Tv.Events.Count - handed), e => e.StartsWith("preview"));
+        home.Tv.PendingOpen!();
+        Assert.Equal(14, home.Tv.Switched[^1]);
+        Assert.Equal("launch", home.Tv.Events[^1]);
+    }
+
+    /// <summary>When the input cannot be switched, Quiet Home stays in front with the error and previews again.</summary>
+    [Fact]
+    public void FailedSwitchKeepsThePreview()
+    {
+        home.Open();
+        home.Tv.SwitchResult = -1;
+        home.Press(RemoteKey.Select);
+        Assert.Contains("source_failed:-1", home.Tv.State);
+        home.Press(RemoteKey.Right, RemoteKey.Left);
+        Assert.Equal(14, home.Tv.Previewing);
+    }
+
+    /// <summary>
+    /// Once an input is opening, no preview is asked for until Quiet Home is in front again,
+    /// even when the TV's notices redraw the page: the console waking up as the TV switches to
+    /// it, before and after Quiet Home goes to the background. A preview then would take the
+    /// TV's picture back to Quiet Home's hidden window and the opened input would stay black.
+    /// </summary>
+    [Fact]
+    public void NoPreviewWhileAnInputOpens()
+    {
+        home.Tv.CurrentSource = 15;
+        home.Tv.Inputs[1].PowerState = 2;
+        home.Tv.CecInputs.Add(14);
+        home.Open();
+        home.Press(RemoteKey.Left, RemoteKey.Select);
+        Assert.Equal(14, home.Tv.Switched[^1]);
+        int launched = home.Tv.Events.Count;
+        home.Tv.Inputs[1].PowerState = 1;
+        home.Tv.RaiseCecChanged();
+        home.Controller.PollInputs();
+        home.Controller.Pause();
+        home.Tv.Inputs[2].PowerState = 2;
+        home.Tv.RaiseChanged();
+        Assert.Equal("On", ((HomePageModel)home.Screen.Content).Inputs[1].Text);
+        Assert.DoesNotContain(home.Tv.Events.GetRange(launched, home.Tv.Events.Count - launched), e => e.StartsWith("preview"));
+        home.Controller.Resume();
+        Assert.Equal(14, home.Tv.Previewing);
+    }
+
+    /// <summary>
+    /// When the TV switches the input by itself while Quiet Home is in front (a console's
+    /// One Touch Play), the focus on the input cards moves to the new input's card, which
+    /// gets the preview; the card focused before must not show the new input's picture.
+    /// </summary>
+    [Fact]
+    public void FocusFollowsAnInputTheTvSwitchesTo()
+    {
+        home.Tv.CurrentSource = 15;
+        home.Open();
+        Assert.Equal("HDMI 3", home.Focused);
+        Assert.Equal(15, home.Tv.Previewing);
+        home.Tv.CurrentSource = 14;
+        home.Controller.PollInputs();
+        Assert.Equal("Console", home.Focused);
+        Assert.Equal(14, home.Tv.Previewing);
+        Assert.Equal(1, home.Tv.PreviewSlot);
+        Assert.Contains("\nactivity=source_followed\n", home.Tv.State);
+    }
+
+    /// <summary>
+    /// Away from the input cards (on the dock) the focus stays where it is when the TV
+    /// switches the input; the input row then leads to the new input's card.
+    /// </summary>
+    [Fact]
+    public void DockKeepsItsFocusWhenTheTvSwitchesTheInput()
+    {
+        home.Tv.CurrentSource = 15;
+        home.Open();
+        home.Press(RemoteKey.Down);
+        string? onDock = home.Focused;
+        home.Tv.CurrentSource = 14;
+        home.Tv.RaiseChanged();
+        Assert.Equal(onDock, home.Focused);
+        Assert.Null(home.Tv.Previewing);
+        home.Launch();
+        Assert.Equal("Console", home.Focused);
+        Assert.Equal(14, home.Tv.Previewing);
     }
 
     /// <summary>Opening an app gives the picture back but keeps the sound muted until Quiet Home goes to the background.</summary>

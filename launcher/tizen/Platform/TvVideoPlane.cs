@@ -7,6 +7,7 @@ using Tizen.TV.Broadcast.TVService;
 using Tizen.TV.Broadcast.TVService.API.Interface;
 using Tizen.TV.Broadcast.TVService.Types;
 using Tizen.TV.NUI;
+using QuietHome.TizenHost.Interop;
 using QuietHome.TizenHost.Views;
 
 namespace QuietHome.TizenHost.Platform;
@@ -15,8 +16,9 @@ namespace QuietHome.TizenHost.Platform;
 /// The TV's main video plane through Samsung's private TV service
 /// (Tizen.TV.Broadcast.TVService and Tizen.TV.NUI from the TV's framework directory): ties
 /// the plane, which shows the input on screen, to Quiet Home's window, places it in a
-/// rectangle and puts it back to full screen, and mutes and unmutes the input's sound. It never changes
-/// the TV's source: previewing another input switched the TV's HDR and game mode. It passes
+/// rectangle and gives it back full screen to the TV's viewer, and mutes and unmutes the
+/// input's sound. It never changes the TV's source: previewing another input switched the
+/// TV's HDR and game mode. It passes
 /// on the TV's notices of the plane's actual size, because the TV may reset the size by
 /// itself. Only <see cref="TizenInputPreview"/> uses it, and only inside try blocks, because
 /// these assemblies and the internal platform privilege may be missing on other TVs. The
@@ -28,7 +30,8 @@ sealed class TvVideoPlane : IDisposable
     const int Done = 1;
     const string LogPath = "/tmp/quiet-preview.txt";
 
-    // Longest wait for the TV to confirm that the plane is untied from the window.
+    // Longest wait for the TV to confirm that the plane is untied from the window, when the
+    // viewer's window is unknown.
     const int UntieWaitMs = 500;
 
     static readonly object logLock = new();
@@ -110,22 +113,53 @@ sealed class TvVideoPlane : IDisposable
         Check(video.SetSize(rect.X, rect.Y, rect.H, rect.W), $"SetSize {rect.X},{rect.Y},{rect.W},{rect.H}");
 
     /// <summary>
-    /// Ends the preview: the plane goes back to full screen and is untied from the window.
-    /// Both steps run even when one fails: the TV keeps the plane's size otherwise, even
-    /// after an input switch. With <paramref name="confirm"/> it waits (at most
-    /// <see cref="UntieWaitMs"/>) for the TV's notice that the window changed, so the TV's
-    /// viewer, started right after, ties the plane to itself only once the untie is done;
-    /// without the wait the input opened black.
+    /// Ends the preview: the plane goes back to full screen and to the window of the TV's
+    /// viewer, where the TV keeps it when Samsung's home is used, since that home never ties
+    /// it. Both steps run even when one fails: the TV keeps the plane's size otherwise, even
+    /// after an input switch. On the QE65S95F the viewer, which stays resumed under Quiet
+    /// Home, did not take the plane back when it opened the input already on screen: an
+    /// untied plane showed nothing, and one left tied to Quiet Home's window went black once
+    /// that window was hidden, while the TV started its screen saver as over an app. When
+    /// the viewer's window is unknown, the plane is untied; with <paramref name="confirm"/>
+    /// it then waits (at most <see cref="UntieWaitMs"/>) for the TV's notice that the window
+    /// changed, because an input opened right after the untie stayed black.
     /// </summary>
     public void Reset(bool confirm)
     {
         Try(() => video.SetSize(0, 0, Layout.ScreenHeight, Layout.ScreenWidth), "SetSize full");
+        int viewer = ViewerWindow();
+        if (viewer > 0)
+        {
+            Try(() => video.SetXWindow((uint)viewer), $"SetXWindow viewer {viewer}");
+            tied = false;
+            return;
+        }
         windowChanged.Reset();
         var watch = System.Diagnostics.Stopwatch.StartNew();
         Try(() => video.SetXWindow(0), "SetXWindow 0");
         if (confirm)
             Log($"untie confirmed {windowChanged.Wait(UntieWaitMs)} after {watch.ElapsedMilliseconds} ms");
         tied = false;
+    }
+
+    /// <summary>
+    /// Returns the resource id of the TV viewer's window from vconf, or 0 when it cannot be
+    /// read (another firmware, or no permission).
+    /// </summary>
+    static int ViewerWindow()
+    {
+        try
+        {
+            int result = Vconf.GetInt(Vconf.ViewerWindowKey, out int window);
+            if (result != 0)
+                Log($"viewer window unreadable {result}");
+            return result == 0 ? window : 0;
+        }
+        catch (Exception ex)
+        {
+            Log("viewer window !! " + ex.GetType().Name);
+            return 0;
+        }
     }
 
     /// <summary>
@@ -198,7 +232,7 @@ sealed class TvVideoPlane : IDisposable
     /// Appends one line with the time to /tmp/quiet-preview.txt, the record of what the TV
     /// service answered; the file starts over past 64 KiB. Never throws.
     /// </summary>
-    static void Log(string line)
+    public static void Log(string line)
     {
         try
         {

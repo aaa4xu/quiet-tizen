@@ -57,6 +57,10 @@ public sealed class HomeController
     // Set after Quiet Home opened an app, which leaves the input's picture black until the
     // input is opened again; the card then keeps its icon instead of a black preview.
     bool appOpened;
+    // Set from opening an input or app, or going to the background, until Quiet Home is in
+    // front again. The TV's notices still redraw the page meanwhile, but a preview then would
+    // take the TV's picture back to a window nobody sees, and the opened input stayed black.
+    bool away;
 
     /// <summary>
     /// Creates the controller and subscribes to the TV's input and CEC changes and preview failures.
@@ -126,10 +130,11 @@ public sealed class HomeController
     /// </summary>
     public void Resume()
     {
+        away = false;
         SilenceInput();
         RefreshCec();
-        RefreshSource();
-        RefreshInputCards();
+        if (!RefreshInputCards())
+            RefreshSource();
         if (builtPage != null && navigator.Page == Page.Settings)
         {
             RefreshSettings();
@@ -146,16 +151,18 @@ public sealed class HomeController
     public void Pause()
     {
         navigator.Adjusting = Adjustment.None;
+        away = true;
         ReleaseScreen(true);
         WriteState("paused");
     }
 
     /// <summary>
     /// The window got the focus back. Samsung Home's source editor opens over this window
-    /// without pausing it, so the inputs are reread here.
+    /// without pausing it, so Quiet Home is in front again here and the inputs are reread.
     /// </summary>
     public void FocusGained()
     {
+        away = false;
         RefreshInputCards();
         WriteState("focus_gained");
     }
@@ -179,14 +186,16 @@ public sealed class HomeController
     }
 
     /// <summary>
-    /// Rereads the inputs and redraws the Home page if one changed. The TV sends no notice when
-    /// a device turns on or off without CEC, so the host calls this every couple of seconds
-    /// while the app is in front. Records only a change.
+    /// Rereads the inputs and the input on screen and redraws the Home page if one changed. The
+    /// TV sends no notice when a device turns on or off without CEC, nor when it switches the
+    /// input by itself, so the host calls this every couple of seconds while the app is in
+    /// front. Records only a change.
     /// </summary>
     public void PollInputs()
     {
+        int before = lastSource;
         if (RefreshInputCards())
-            WriteState("input_power");
+            WriteState(lastSource != before ? "source_followed" : "input_power");
     }
 
     /// <summary>
@@ -196,6 +205,7 @@ public sealed class HomeController
     /// </summary>
     public void AppControl(LaunchOptions options)
     {
+        away = false;
         bool changed = ApplyLaunchOptions(options);
         SilenceInput();
         if (options.Page == Page.Settings)
@@ -398,14 +408,37 @@ public sealed class HomeController
     }
 
     /// <summary>
-    /// On the Home page (not while adjusting), rereads the inputs and redraws the page if they
-    /// changed; returns whether it redrew.
+    /// On the Home page (not while adjusting), rereads the inputs and the input on screen and
+    /// redraws the page if either changed; returns whether it redrew.
     /// </summary>
     bool RefreshInputCards()
     {
-        if (builtPage == null || navigator.Page != Page.Home || navigator.Adjusting != Adjustment.None || !RefreshInputSources())
+        if (builtPage == null || navigator.Page != Page.Home || navigator.Adjusting != Adjustment.None)
+            return false;
+        bool inputsChanged = RefreshInputSources();
+        if (!FollowSource() && !inputsChanged)
             return false;
         Rebuild();
+        return true;
+    }
+
+    /// <summary>
+    /// While Quiet Home is in front, rereads the input on screen. When the TV switched it by
+    /// itself (a console's One Touch Play over HDMI-CEC) and the focus is on the input cards
+    /// or the tabs, the focus moves to the new input's card, the one shown wide with the
+    /// preview: the TV puts the new input's picture wherever the preview is. Returns whether
+    /// the input on screen changed.
+    /// </summary>
+    bool FollowSource()
+    {
+        if (away)
+            return false;
+        int before = lastSource;
+        RefreshSource();
+        if (lastSource == before)
+            return false;
+        if (navigator.Zone == Zone.FirstRow || navigator.Zone == Zone.Tabs)
+            navigator.Selected = SourceIndex();
         return true;
     }
 
@@ -473,7 +506,8 @@ public sealed class HomeController
     /// <summary>
     /// Asks for the live picture of the input card shown wide (focused, or the one Down
     /// would focus from the Home tab), or puts the preview away when there is none to
-    /// preview. Only the card of the input on screen gets one: its
+    /// preview. Nothing is previewed while Quiet Home is away (an input or app is opening, or
+    /// it is in the background). Only the card of the input on screen gets one: its
     /// picture is already there, so the TV changes no source, HDR or game mode for it, while
     /// previewing another input switched those modes on every focus move. Live TV gets none
     /// (without an antenna the TV covers the screen with its notice), nor does demo mode,
@@ -486,7 +520,7 @@ public sealed class HomeController
         if (preview == PreviewState.Unsupported)
             return;
         int slot = navigator.Selected;
-        bool previewable = !demo && builtPage == Page.Home && navigator.Page == Page.Home
+        bool previewable = !demo && !away && builtPage == Page.Home && navigator.Page == Page.Home
             && (navigator.Zone == Zone.FirstRow || navigator.Zone == Zone.Tabs)
             && navigator.Adjusting == Adjustment.None && slot >= 0 && slot < inputSources.Count
             && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource && !appOpened
@@ -685,21 +719,53 @@ public sealed class HomeController
 
     /// <summary>
     /// Switches the TV to input <paramref name="source"/> and opens its picture; a failure is
-    /// shown and recorded. The TV gets its full-screen picture and sound back first.
+    /// shown and recorded. The preview ends first, and the TV's viewer gets the full-screen
+    /// picture and sound back once the preview's hole is gone and the viewer has paused (see
+    /// <see cref="IInputPreview.HandToViewer"/>), so the switch happens a moment later.
     /// </summary>
     void SelectSource(int source)
     {
-        ReleaseScreen(true);
+        if (preview == PreviewState.On)
+            preview = PreviewState.Off;
+        // Set before the wait, so no redraw meanwhile asks for a preview, which would open the hole again.
+        away = true;
+        bool opened = false;
+        // Opens the input once, whether the port runs it or fails before it could.
+        void Open()
+        {
+            if (opened)
+                return;
+            opened = true;
+            OpenSource(source);
+        }
+        try
+        {
+            tv.Preview.HandToViewer(Open);
+        }
+        catch (Exception)
+        {
+            Open();
+        }
+    }
+
+    /// <summary>
+    /// Switches the TV to input <paramref name="source"/> and starts its viewer; when either
+    /// fails, Quiet Home stays in front and shows the failure.
+    /// </summary>
+    void OpenSource(int source)
+    {
         int result = Inputs.Switch(source);
         if (result < 0)
         {
+            away = false;
             ShowError("Input could not be switched. Open Advanced settings to check the connection.");
             WriteState("source_failed:" + result);
             return;
         }
         lastSource = source;
         appOpened = false;
-        Launch(LaunchRequest.TvViewer);
+        if (!Launch(LaunchRequest.TvViewer))
+            away = false;
     }
 
     /// <summary>
@@ -718,8 +784,12 @@ public sealed class HomeController
         }
         WriteState(request.Activity(result.Code));
         if (result.Code != 0)
+        {
             ShowError("Could not open this screen. Try Advanced settings.");
-        return result.Code == 0;
+            return false;
+        }
+        away = true;
+        return true;
     }
 
     /// <summary>Shows <paramref name="text"/> as the notice.</summary>

@@ -82,7 +82,7 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     /// <summary>When true, the TV refuses every preview and raises <see cref="Failed"/>.</summary>
     public bool PreviewFails { get; set; }
 
-    /// <summary>Previews, hides, releases, mutes, input switches and launches in the order they reached the TV, for example "silence", "preview 14", "release", "switch 14", "launch".</summary>
+    /// <summary>Previews, hides, releases, mutes, input switches and launches in the order they reached the TV, for example "silence", "preview 14", "release", "viewer", "switch 14", "launch".</summary>
     public List<string> Events { get; } = new();
 
     /// <summary>The last diagnostics text.</summary>
@@ -236,6 +236,27 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
         Events.Add(sound ? "release+sound" : "release");
         Previewing = null;
         PreviewSlot = -1;
+    }
+
+    /// <summary>When true, <see cref="HandToViewer"/> keeps the input's opening in <see cref="PendingOpen"/>, as while the viewer has not paused yet.</summary>
+    public bool HoldViewer { get; set; }
+
+    /// <summary>The opening <see cref="HandToViewer"/> holds back while <see cref="HoldViewer"/> is set.</summary>
+    public Action? PendingOpen { get; set; }
+
+    /// <summary>
+    /// Records that Quiet Home gave the screen to the TV's viewer, ending any preview, as
+    /// "release+sound" and "viewer", then opens the input at once, or keeps it back while
+    /// <see cref="HoldViewer"/> is set.
+    /// </summary>
+    public void HandToViewer(Action open)
+    {
+        Release(true);
+        Events.Add("viewer");
+        if (HoldViewer)
+            PendingOpen = open;
+        else
+            open();
     }
 
     /// <summary>Keeps the diagnostics text.</summary>

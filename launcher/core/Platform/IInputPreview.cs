@@ -43,6 +43,18 @@ public interface IInputPreview
     void Release(bool sound);
 
     /// <summary>
+    /// Quiet Home is about to open an input in the TV's viewer: ends any preview at once and,
+    /// once its hole is gone from the screen and the viewer below Quiet Home has paused, does
+    /// what <see cref="Release"/> with sound does and runs <paramref name="open"/>, which
+    /// switches the input and starts the viewer; the port may run it later on the UI thread.
+    /// Going full screen only then keeps a stretched picture out of the hole. The viewer turns
+    /// on its TV behaviour only when it resumes from a pause: on the QE65S95F, a viewer opened
+    /// from under a launcher it could see through let the TV start its screen saver over the
+    /// input after two minutes, as over an app.
+    /// </summary>
+    void HandToViewer(Action open);
+
+    /// <summary>
     /// Mutes the sound of the input on screen while Quiet Home is in front, as Samsung's
     /// home does; <see cref="Release"/> turns it back on.
     /// </summary>

@@ -256,6 +256,13 @@ sealed class HomeView : IHomeView
             view.Opacity = opacity;
     }
 
+    /// <summary>
+    /// Tells the window system whether the window covers what is below it. Covered, the TV's
+    /// viewer below counts as hidden and pauses, as under Samsung's opaque home; the video
+    /// plane then shows nothing, so the preview port covers it only while an input opens.
+    /// </summary>
+    public void Cover(bool covered) => Window.Default.SetOpaqueState(covered);
+
     /// <summary>Removes the see-through hole from its card, if there is one; the preview port calls it when the preview ends.</summary>
     public void CloseHole()
     {
