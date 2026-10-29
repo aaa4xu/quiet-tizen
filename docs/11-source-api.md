@@ -21,7 +21,8 @@ Each entry has these fields:
 | `connectionState` | `true` for connected inputs; Quiet Home shows only these |
 | `detectedName` | Name reported by the device, URL-encoded (`PlayStation%205`); empty for a device that sends none |
 | `editName` | Name set in Samsung's source list, URL-encoded; empty when unset |
-| `editState`, `settingMethod`, `powerState`, `mbrActivityIndex` | Integers; meaning not established |
+| `powerState` | 1 while the device sends a signal, 2 while it does not, 0 for Live TV; see [the input-state findings](13-input-state.md) |
+| `editState`, `settingMethod`, `mbrActivityIndex` | Integers; meaning not established |
 | `iconPath` | SVG under `/usr/apps/com.samsung.tv.theme-resource/shared/res/VD_ICONS/`, e.g. `i_icon_device_m_gamepad.svg`, `i_icon_device_m_hdmi3.svg` |
 | `launcherFocusedIconPath`, `launcherUnfocusedIconPath`, `uniqueKey` | Empty here |
 | `flagLegacySource` | `true` for the HDMI inputs |
@@ -40,7 +41,8 @@ and plugging it back produced one call each, about eight seconds apart.
 `what` was 0 both times, `data` came back unchanged, and the calls arrived on
 a thread other than the caller's. A disconnected device disappeared from
 `get_source_list()` instead of turning `connectionState` false. Editing an
-input in Samsung's source list also fires the callback.
+input in Samsung's source list also fires the callback. A device turning on or off does not:
+only its `powerState` changes ([input state](13-input-state.md)).
 
 Quiet Home subscribes at start-up and posts each call to its UI thread
 through the NUI synchronization context; the Home page then rereads the

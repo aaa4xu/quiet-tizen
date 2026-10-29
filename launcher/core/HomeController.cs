@@ -33,6 +33,7 @@ public sealed class HomeController
     readonly QuickSettingsState settings = new();
     readonly DemoInputSources demoInputs;
     readonly DemoClock demoClock = new();
+    readonly DemoCecDevices demoCec = new();
     DemoQuickSettings demoSettings = new();
     DemoThemeStore demoTheme = new();
 
@@ -42,6 +43,8 @@ public sealed class HomeController
     string libraryError = "";
     List<InputSource> inputSources = new();
     string inputError = "";
+    // Inputs whose port has a CEC device; read on start, resume and the TV's CEC notice, not on every poll.
+    IReadOnlySet<int> cecInputs = new HashSet<int>();
     // The input list is read once per event; a rebuild reads it only on arriving at Home without a fresh reading.
     bool inputsFresh;
     Page? builtPage;
@@ -56,7 +59,7 @@ public sealed class HomeController
     bool appOpened;
 
     /// <summary>
-    /// Creates the controller and subscribes to the TV's input changes and preview failures.
+    /// Creates the controller and subscribes to the TV's input and CEC changes and preview failures.
     /// Nothing is shown until <see cref="Start"/>.
     /// </summary>
     public HomeController(HomePorts tv, IHomeView view, HomeConfig config)
@@ -66,6 +69,7 @@ public sealed class HomeController
         this.config = config;
         demoInputs = new DemoInputSources(tv.Inputs, config.DemoInputs);
         tv.Inputs.Changed += SourcesChanged;
+        tv.Cec.Changed += CecChanged;
         tv.Preview.Failed += PreviewFailed;
         view.ArtworkLoaded += ArtworkLoaded;
     }
@@ -88,6 +92,8 @@ public sealed class HomeController
 
     IClock Clock => demo ? demoClock : tv.Clock;
 
+    ICecDevices Cec => demo ? demoCec : tv.Cec;
+
     /// <summary>
     /// Starts the app: loads the owner's catalog and theme, starts loading artwork, shows
     /// the Home page with the input on screen focused and mutes the input's sound.
@@ -105,6 +111,7 @@ public sealed class HomeController
         ownLibrary = library;
         LoadTheme();
         view.Preload(library);
+        RefreshCec();
         RefreshSource();
         navigator.Selected = SourceIndex();
         Rebuild();
@@ -114,12 +121,13 @@ public sealed class HomeController
 
     /// <summary>
     /// The app came back to the foreground: mutes the input's sound, rereads the input on
-    /// screen and the inputs, and the settings on the Settings page; on the Home page the
+    /// screen, the CEC devices and the inputs, and the settings on the Settings page; on the Home page the
     /// input preview comes back.
     /// </summary>
     public void Resume()
     {
         SilenceInput();
+        RefreshCec();
         RefreshSource();
         RefreshInputCards();
         if (builtPage != null && navigator.Page == Page.Settings)
@@ -157,6 +165,28 @@ public sealed class HomeController
     {
         RefreshInputCards();
         WriteState("sources_changed");
+    }
+
+    /// <summary>
+    /// The TV reported a change in its CEC devices (it does when a console turns on or goes to
+    /// rest mode): rereads them and the inputs, and redraws the Home page if a card changed.
+    /// </summary>
+    public void CecChanged()
+    {
+        RefreshCec();
+        RefreshInputCards();
+        WriteState("cec_changed");
+    }
+
+    /// <summary>
+    /// Rereads the inputs and redraws the Home page if one changed. The TV sends no notice when
+    /// a device turns on or off without CEC, so the host calls this every couple of seconds
+    /// while the app is in front. Records only a change.
+    /// </summary>
+    public void PollInputs()
+    {
+        if (RefreshInputCards())
+            WriteState("input_power");
     }
 
     /// <summary>
@@ -256,6 +286,7 @@ public sealed class HomeController
     {
         ReleaseScreen(true);
         tv.Inputs.Changed -= SourcesChanged;
+        tv.Cec.Changed -= CecChanged;
         tv.Preview.Failed -= PreviewFailed;
         view.ArtworkLoaded -= ArtworkLoaded;
     }
@@ -289,6 +320,7 @@ public sealed class HomeController
                 }
             }
             library = demo ? publicLibrary! : ownLibrary;
+            RefreshCec();
         }
         if (options.Dark is bool wantDark)
         {
@@ -349,22 +381,32 @@ public sealed class HomeController
     /// <summary>Returns the slot of the input on screen among the input cards (the page's first slots); 0 in demo mode or when it is not connected.</summary>
     int SourceIndex() => demo ? 0 : Math.Max(0, inputSources.FindIndex(s => s.SourceType == lastSource));
 
-    /// <summary>Rereads the connected inputs; returns whether they changed.</summary>
+    /// <summary>Reads which inputs have a CEC device; the TV's port never throws.</summary>
+    void RefreshCec() => cecInputs = Cec.Inputs();
+
+    /// <summary>Rereads the connected inputs, marks those with a CEC device and returns whether they changed.</summary>
     bool RefreshInputSources()
     {
         string before = InputList.Fingerprint(inputSources);
         var reading = Inputs.Read();
         inputSources = reading.Inputs;
+        foreach (var source in inputSources)
+            source.CecDevice = cecInputs.Contains(source.SourceType);
         inputError = reading.Error;
         inputsFresh = true;
         return before != InputList.Fingerprint(inputSources);
     }
 
-    /// <summary>On the Home page (not while adjusting), rereads the inputs and redraws the page if they changed.</summary>
-    void RefreshInputCards()
+    /// <summary>
+    /// On the Home page (not while adjusting), rereads the inputs and redraws the page if they
+    /// changed; returns whether it redrew.
+    /// </summary>
+    bool RefreshInputCards()
     {
-        if (builtPage != null && navigator.Page == Page.Home && navigator.Adjusting == Adjustment.None && RefreshInputSources())
-            Rebuild();
+        if (builtPage == null || navigator.Page != Page.Home || navigator.Adjusting != Adjustment.None || !RefreshInputSources())
+            return false;
+        Rebuild();
+        return true;
     }
 
     /// <summary>Reads the stored theme: dark unless "light" is stored.</summary>
@@ -436,7 +478,8 @@ public sealed class HomeController
     /// previewing another input switched those modes on every focus move. Live TV gets none
     /// (without an antenna the TV covers the screen with its notice), nor does demo mode,
     /// nor any card after the TV refused a preview, nor after Quiet Home opened an app (the
-    /// TV plays no picture then until the input is opened again).
+    /// TV plays no picture then until the input is opened again), nor an input whose device
+    /// sends no signal (standby or off): its card keeps the icon instead of black.
     /// </summary>
     void UpdatePreview()
     {
@@ -446,7 +489,8 @@ public sealed class HomeController
         bool previewable = !demo && builtPage == Page.Home && navigator.Page == Page.Home
             && (navigator.Zone == Zone.FirstRow || navigator.Zone == Zone.Tabs)
             && navigator.Adjusting == Adjustment.None && slot >= 0 && slot < inputSources.Count
-            && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource && !appOpened;
+            && inputSources[slot].SourceType != 0 && inputSources[slot].SourceType == lastSource && !appOpened
+            && InputPowers.Of(inputSources[slot]) is not (InputPower.Standby or InputPower.NoSignal);
         if (!previewable)
         {
             HidePreview();
@@ -709,6 +753,7 @@ public sealed class HomeController
                 LibraryError = libraryError,
                 Inputs = string.Join(",", inputSources.ConvertAll(s => s.SourceType.ToString())),
                 InputError = inputError,
+                InputStates = string.Join(",", inputSources.ConvertAll(s => s.SourceType + ":" + InputPowers.Of(s))),
                 SourceCallback = tv.Inputs.WatchStatus,
                 SelectedName = cards != null && selected >= 0 && selected < cards.Count ? cards[selected].Name : "",
                 ArtworkCached = stats.ArtworkCached,

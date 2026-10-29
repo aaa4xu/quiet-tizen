@@ -18,18 +18,21 @@ public sealed class QuietHomeApplication : NUIApplication
 {
     const string DemoIcons = "/usr/apps/com.samsung.tv.theme-resource/shared/res/VD_ICONS/i_icon_device_m_";
 
-    // The inputs demo mode shows; their icons are the TV's own files.
+    // The inputs demo mode shows; their icons are the TV's own files. The console is on and HDMI 2 sends nothing.
     static readonly InputSource[] demoInputs =
     {
         new() { ConnectionState = true, SourceType = 0, IconPath = DemoIcons + "tv.svg" },
-        new() { ConnectionState = true, SourceType = 14, EditName = "Game console", IconPath = DemoIcons + "gamepad.svg" },
-        new() { ConnectionState = true, SourceType = 15, IconPath = DemoIcons + "hdmi2.svg" },
+        new() { ConnectionState = true, SourceType = 14, EditName = "Game console", IconPath = DemoIcons + "gamepad.svg", PowerState = 1 },
+        new() { ConnectionState = true, SourceType = 15, IconPath = DemoIcons + "hdmi2.svg", PowerState = 2 },
     };
 
     TizenInputSources? inputs;
+    TizenCecDevices? cec;
     TizenInputPreview? preview;
     HomeController? controller;
     Tizen.NUI.Timer? clockTimer;
+    // Rereads the inputs while the app is in front: the TV sends no notice when a device turns on or off.
+    Tizen.NUI.Timer? inputTimer;
 
     /// <summary>Starts Quiet Home: creates the ports, view and controller, subscribes to the window and shows the Home page.</summary>
     protected override void OnCreate()
@@ -38,9 +41,10 @@ public sealed class QuietHomeApplication : NUIApplication
         // The container's res/quiet-home/ (on the QE65S95F /opt/usr/apps/<container>/res/quiet-home/).
         string root = System.IO.Path.Combine(DirectoryInfo.Resource, "quiet-home") + "/";
         inputs = new TizenInputSources();
+        cec = new TizenCecDevices();
         var view = new HomeView(root);
         preview = new TizenInputPreview(view);
-        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile(), preview);
+        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile(), preview, cec);
         var home = new HomeController(ports, view, new HomeConfig(root + "apps.json", root + "apps.public.json", demoInputs));
         controller = home;
         Window.Default.Title = "Quiet Home";
@@ -51,6 +55,7 @@ public sealed class QuietHomeApplication : NUIApplication
                 home.FocusGained();
         };
         inputs.Watch(SynchronizationContext.Current);
+        cec.Watch(SynchronizationContext.Current);
         home.Start();
         clockTimer = new Tizen.NUI.Timer(30000);
         clockTimer.Tick += (s, e) =>
@@ -59,22 +64,31 @@ public sealed class QuietHomeApplication : NUIApplication
             return true;
         };
         clockTimer.Start();
+        inputTimer = new Tizen.NUI.Timer(1500);
+        inputTimer.Tick += (s, e) =>
+        {
+            home.PollInputs();
+            return true;
+        };
+        inputTimer.Start();
     }
 
-    /// <summary>Back in front: restarts the clock and lets the controller reread the TV.</summary>
+    /// <summary>Back in front: restarts the clock and the input poll and lets the controller reread the TV.</summary>
     protected override void OnResume()
     {
         base.OnResume();
         clockTimer?.Start();
+        inputTimer?.Start();
         controller?.Resume();
     }
 
-    /// <summary>In the background: stops the clock.</summary>
+    /// <summary>In the background: stops the clock and the input poll.</summary>
     protected override void OnPause()
     {
         base.OnPause();
         controller?.Pause();
         clockTimer?.Stop();
+        inputTimer?.Stop();
     }
 
     /// <summary>Launched again (Home key, QuickLaunch, screenshot recipe): passes the launch extras to the controller.</summary>
@@ -84,14 +98,16 @@ public sealed class QuietHomeApplication : NUIApplication
         var extra = e.ReceivedAppControl.ExtraData;
         var options = LaunchOptions.Parse(key => extra.TryGet(key, out string value) ? value : null);
         clockTimer?.Start();
+        inputTimer?.Start();
         controller?.AppControl(options);
     }
 
-    /// <summary>Ending: stops the controller, the TV's input callback and the input preview.</summary>
+    /// <summary>Ending: stops the controller, the TV's input and CEC callbacks and the input preview.</summary>
     protected override void OnTerminate()
     {
         controller?.Terminate();
         inputs?.Dispose();
+        cec?.Dispose();
         preview?.Dispose();
         base.OnTerminate();
     }

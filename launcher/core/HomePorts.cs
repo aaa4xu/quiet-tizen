@@ -14,6 +14,7 @@ namespace QuietHome.Core;
 /// <param name="Launcher">Opens other apps.</param>
 /// <param name="Diagnostics">The diagnostics file.</param>
 /// <param name="Preview">The live picture of an input inside its card.</param>
+/// <param name="Cec">The HDMI-CEC devices on the inputs.</param>
 public sealed record HomePorts(
     IInputSources Inputs,
     IQuickSettings QuickSettings,
@@ -21,4 +22,5 @@ public sealed record HomePorts(
     IClock Clock,
     ISystemLauncher Launcher,
     IDiagnostics Diagnostics,
-    IInputPreview Preview);
+    IInputPreview Preview,
+    ICecDevices Cec);

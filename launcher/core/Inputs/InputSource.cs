@@ -22,4 +22,16 @@ public sealed class InputSource
 
     /// <summary>The TV's number for the input; 0 is the tuner (Live TV). Switching inputs uses this number.</summary>
     public int SourceType { get; set; }
+
+    /// <summary>
+    /// 1 while the device sends a signal, 2 while it does not; 0 for Live TV. The TV updates it
+    /// as devices turn on and off without a change notice, so the Home page rereads the list.
+    /// </summary>
+    public int PowerState { get; set; }
+
+    /// <summary>
+    /// True when a device answers HDMI-CEC on this input's port. Not part of the source list:
+    /// <see cref="HomeController"/> fills it from <see cref="Platform.ICecDevices"/> after each reading.
+    /// </summary>
+    public bool CecDevice { get; set; }
 }

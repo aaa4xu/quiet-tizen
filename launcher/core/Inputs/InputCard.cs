@@ -13,7 +13,10 @@ public sealed class InputCard
     /// <summary>Card title, for example "Live TV", "Game console" or "HDMI 3".</summary>
     public string Name { get; }
 
-    /// <summary>Line under the title: "Broadcast channels", the HDMI port, or "Connected input".</summary>
+    /// <summary>
+    /// Line under the title: "Broadcast channels", or the HDMI port and the device's state
+    /// ("HDMI 2 · Standby"); see <see cref="For"/>.
+    /// </summary>
     public string Description { get; }
 
     /// <summary>Creates a card; use <see cref="For"/> to get one for an input.</summary>
@@ -28,7 +31,9 @@ public sealed class InputCard
     /// the owner's rename in Samsung's source list wins over the name the device reports;
     /// both arrive URL-encoded. An input without either name is called after its HDMI port,
     /// taken from the icon file name ("...hdmi3.svg" gives "HDMI 3"), or "HDMI input" when
-    /// the icon shows no port. A named HDMI input shows its port on the second line.
+    /// the icon shows no port. The second line holds the HDMI port of a named input and the
+    /// device's <see cref="InputPower"/>, joined by " · " ("HDMI 2 · Standby"); with one of them
+    /// it holds just that, and with neither "Connected input".
     /// </summary>
     public static InputCard For(InputSource source)
     {
@@ -36,7 +41,13 @@ public sealed class InputCard
         var port = Regex.Match(source.IconPath ?? "", @"hdmi(\d+)\.svg$");
         string hdmi = port.Success ? "HDMI " + port.Groups[1].Value : "";
         string name = source.SourceType == 0 ? "Live TV" : !string.IsNullOrWhiteSpace(raw) ? Uri.UnescapeDataString(raw) : hdmi != "" ? hdmi : "HDMI input";
-        string description = source.SourceType == 0 ? "Broadcast channels" : name != hdmi && hdmi != "" ? hdmi : "Connected input";
+        string? state = InputPowers.Text(InputPowers.Of(source));
+        // The port goes on the second line only when the title is another name.
+        string named = name != hdmi ? hdmi : "";
+        string description = source.SourceType == 0 ? "Broadcast channels"
+            : named != "" && state != null ? named + " · " + state
+            : named != "" ? named
+            : state ?? "Connected input";
         return new InputCard(name, description);
     }
 }

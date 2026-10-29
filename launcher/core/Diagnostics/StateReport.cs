@@ -100,6 +100,12 @@ public sealed class StateReport
     public Platform.PreviewState Preview { get; set; }
 
     /// <summary>
+    /// Line <c>input_states=</c>: each input card's source type and <see cref="Inputs.InputPower"/>,
+    /// for example "0:Unknown,14:Standby". Added after <c>preview=</c> for the same reason.
+    /// </summary>
+    public string InputStates { get; set; } = "";
+
+    /// <summary>
     /// Returns the file's text: <paramref name="utcNow"/> in round-trip format, then every
     /// line in the fixed order, each ending with a newline. Booleans read "True" / "False".
     /// </summary>
@@ -135,5 +141,6 @@ public sealed class StateReport
         + "\ngame-mode=" + GameMode
         + "\nsleeptimer=" + SleepTimer
         + "\npreview=" + Platform.PreviewStateNames.Name(Preview)
+        + "\ninput_states=" + InputStates
         + "\n";
 }

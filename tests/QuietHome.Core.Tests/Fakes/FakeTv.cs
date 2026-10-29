@@ -9,11 +9,11 @@ namespace QuietHome.Core.Tests.Fakes;
 /// <summary>
 /// A test stand-in for the TV: it implements every platform port the core's
 /// <see cref="HomeController"/> relies on (inputs, quick settings, theme file, clock at
-/// 6:05 PM, app launcher, diagnostics file, input preview) in memory. Tests set what the TV reports and
+/// 6:05 PM, app launcher, diagnostics file, input preview, CEC devices) in memory. Tests set what the TV reports and
 /// what fails, then check what the controller asked of it. The Tizen implementations it
 /// replaces live in launcher/tizen/Platform. Used through <see cref="HomeHarness"/>.
 /// </summary>
-sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics, IInputPreview
+sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics, IInputPreview, ICecDevices
 {
     /// <summary>Creates the TV with a brightness of 30 and the sleep timer off.</summary>
     public FakeTv()
@@ -23,7 +23,7 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     }
 
     /// <summary>The ports bundle over this TV.</summary>
-    public HomePorts Ports => new(this, this, this, this, this, this, this);
+    public HomePorts Ports => new(this, this, this, this, this, this, this, this);
 
     /// <summary>The connected inputs.</summary>
     public List<InputSource> Inputs { get; set; } = new();
@@ -103,11 +103,44 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     /// <summary>Simulates the TV's change notice.</summary>
     public void RaiseChanged() => Changed?.Invoke();
 
-    /// <summary>Counts the read and returns a copy of the inputs.</summary>
+    /// <summary>The inputs whose port has a CEC device.</summary>
+    public HashSet<int> CecInputs { get; } = new();
+
+    /// <summary>How many times the CEC devices were read.</summary>
+    public int CecReads { get; private set; }
+
+    // Raised by RaiseCecChanged; named apart from the input list's notice, which has the same event name.
+    event Action? cecChanged;
+
+    /// <summary>Raised by <see cref="RaiseCecChanged"/>.</summary>
+    event Action? ICecDevices.Changed
+    {
+        add => cecChanged += value;
+        remove => cecChanged -= value;
+    }
+
+    /// <summary>Simulates the TV's notice that its CEC device list changed.</summary>
+    public void RaiseCecChanged() => cecChanged?.Invoke();
+
+    /// <summary>Counts the read and returns a copy of <see cref="CecInputs"/>.</summary>
+    IReadOnlySet<int> ICecDevices.Inputs()
+    {
+        CecReads++;
+        return new HashSet<int>(CecInputs);
+    }
+
+    /// <summary>
+    /// Counts the read and returns copies of the inputs, as the TV gives new objects on every
+    /// read: a test can change <see cref="Inputs"/> in place and the controller still sees the change.
+    /// </summary>
     public InputReading Read()
     {
         Reads++;
-        return new InputReading(new List<InputSource>(Inputs), "");
+        return new InputReading(Inputs.ConvertAll(s => new InputSource
+        {
+            ConnectionState = s.ConnectionState, DetectedName = s.DetectedName, EditName = s.EditName,
+            IconPath = s.IconPath, SourceType = s.SourceType, PowerState = s.PowerState,
+        }), "");
     }
 
     /// <summary>Returns the input on screen.</summary>

@@ -26,8 +26,9 @@ public static class InputList
 
     /// <summary>
     /// Returns a string that changes whenever an input is added, removed, renamed or gets
-    /// another icon, so two lists can be compared with a plain string comparison.
+    /// another icon, or its device turns on or off, so two lists can be compared with a plain
+    /// string comparison.
     /// </summary>
     public static string Fingerprint(List<InputSource> inputs) =>
-        string.Join(";", inputs.ConvertAll(s => s.SourceType + ":" + s.EditName + ":" + s.DetectedName + ":" + s.IconPath));
+        string.Join(";", inputs.ConvertAll(s => s.SourceType + ":" + s.EditName + ":" + s.DetectedName + ":" + s.IconPath + ":" + InputPowers.Of(s)));
 }

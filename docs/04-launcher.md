@@ -66,6 +66,13 @@ select an input from the native menu. The **Edit inputs** button at the top
 right of the Home page opens Samsung Home's source list, where holding Select
 on an input edits its name and device type. See [the source-list API findings](11-source-api.md).
 
+The line under each input's name also says whether its device is on:
+`HDMI 2 · On`, `HDMI 2 · Standby` for a device in rest mode that answers
+HDMI-CEC, or `HDMI 3 · No signal`. The signal comes from the source list's
+`powerState` and the standby from the TV's CEC service over D-Bus. The TV
+sends no notice for this, so Quiet Home rereads the list every 1.5 seconds
+while it is in front. See [the input-state findings](13-input-state.md).
+
 On the QE65S95F (`T-RSMFDEUC-0090-1301.0`) the call returned a JSON array
 allocated with `malloc`: Live TV (`sourceType` 0), a PlayStation 5 (14) and an
 unnamed HDMI 3 (15), each with an icon from `com.samsung.tv.theme-resource`.
@@ -77,7 +84,8 @@ That card shows the input's live picture: the TV's main video plane is moved
 into it through Samsung's private TV service. Only the input already on screen
 is previewed, because previewing another one switched the TV's source or
 pipeline and with it HDR and Game Mode on every focus move; Live TV keeps its
-icon. While Quiet Home is in front it mutes the input's sound, as Samsung's
+icon, and so does an input whose device is in standby or sends no signal.
+While Quiet Home is in front it mutes the input's sound, as Samsung's
 home does, and turns it back on when an input opens or Quiet Home goes to the
 background. Before an input or app opens the TV's full-screen picture is put
 back first. After an app the TV plays no picture until the input is opened
@@ -391,8 +399,9 @@ layout does not change: one DLL and `res/quiet-home`.
     implements.
   - `Platform/` holds the ports to the TV: `IInputSources`,
     `IQuickSettings`, `IThemeStore`, `IClock`, `ISystemLauncher`,
-    `IDiagnostics` and `IInputPreview`, passed together as `HomePorts`. `Platform/Demo/` holds
-    the in-memory versions that demo mode puts in front of them.
+    `IDiagnostics`, `IInputPreview` and `ICecDevices`, passed together as
+    `HomePorts`. `Platform/Demo/` holds the in-memory versions that demo
+    mode puts in front of them.
   - `Actions/HomeAction` lists what Select on a card can do.
     `Settings/SettingsTile` is the table of Settings tiles, and
     `QuickSettingsState` holds the values read from the TV. `Catalog/`,
@@ -406,6 +415,7 @@ layout does not change: one DLL and `res/quiet-home`.
     `Interop/`. `TizenInputPreview` and `TvVideoPlane` implement the input
     preview and the mute with the TV service assemblies; `PreviewHole` in
     `Views/` cuts the see-through hole the picture shows in.
+    `TizenCecDevices` asks the CEC service over D-Bus through `Interop/Gio`.
   - `Views/` draws a `HomeScreen` with NUI. `HomeView` draws the chrome,
     focus and notice, and one view per page draws that page's content.
     `Layout` holds the coordinates and sizes, and `ArtworkCache` keeps app
@@ -493,16 +503,18 @@ checked only on the TV: by the demo frames and with the remote.
 
 Quiet Home rewrites `/tmp/quiet-home-state.txt` after every event. The file
 holds the page and focus, the last activity and key, the inputs, the catalog
-and artwork counters, the quick-setting values and, last, `preview=` (`on`,
-`off` or `unsupported`). Its keys and their order are a contract for the
+and artwork counters, the quick-setting values, `preview=` (`on`, `off` or
+`unsupported`) and, last, `input_states=` (each input card's source type and
+state, such as `14:Standby`). Its keys and their order are a contract for the
 recipes and tools that read it; new keys go at the end.
 
 `build_ms` measures how long the view takes to build a page's NUI objects. It
 does not measure input-to-photon latency or the complete rendering time. It
 also leaves out reading the TV's settings and input list. The settings are
 read before the page is built. The input list is read once per event and
-kept: start, resume, window focus, the TV's change callback, a Home request
-and arriving at the Home page. The Home page is built from that kept list.
+kept: start, resume, window focus, the TV's change callback, the CEC
+service's notice, the 1.5-second poll on the Home page, a Home request and
+arriving at the Home page. The Home page is built from that kept list.
 Builds from before the input list moved behind `IInputSources` also counted
 `get_source_list()`, so their values are not comparable.
 
@@ -525,6 +537,8 @@ remote what the frames do not show:
 
 - every page;
 - switching inputs, with picture and sound;
+- the state under the input cards: turn a device on and off and watch
+  `On`, `Standby` or `No signal` follow within a few seconds;
 - the input preview: the card of the input on screen shows it without
   sound, other cards change no picture mode, and opening the input or leaving
   Quiet Home gives a full-screen picture with sound (the frames cannot show
