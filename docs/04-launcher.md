@@ -47,7 +47,8 @@ python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
 This builds `BixbyPromotion.dll`, `QuickLaunch.dll` and `Probe.dll`, then
-assembles `.local/package/`. For another documented model, add its profile, for
+assembles `.local/package/`. It also builds `Frame.dll` for `tools/frame.py`,
+which stays out of the package. For another documented model, add its profile, for
 example `--profile profiles/qe65s95fauxru-1301.0.json`; the profile's
 `launcher` block names the host package and the entry assembly to build.
 Public app cards are plain placeholders showing the app's name;
@@ -198,6 +199,23 @@ An optional width and height follow the path (default 1920 1080). Only the
 UI is captured: an HDMI or TV picture comes out black, and so does the whole
 frame while the screen is off. Keep the images in `.local/`; they can show
 account names, app lists and other personal details.
+
+To see the picture as well, `tools/frame.py` captures both layers and lays the
+UI over the video where the UI is see-through, such as the input preview:
+
+```sh
+python3 tools/frame.py --host "$TV_IP" --sdb "$SDB" --out .local/frames/now.png
+```
+
+The video plane comes from `secvideo_api_capture_screen_video_only` in
+`libvideo-capture.so`, the call the WLED ambilight experiments used. On the
+QE65S95F it worked from the temporary root session and returned 720x576 NV12
+(limited-range BT.709) whatever size was asked for, so the picture is blurrier
+than the UI around it. The UI screenshot's fourth byte is its alpha even though
+its format says XRGB8888: 0 in the preview hole and 255 elsewhere. The tool
+also keeps both layers and the diagnostics file of that moment next to the
+PNG. A run takes four SDB sessions, about 40 seconds. A screen saver over the
+picture is captured too: the tool shows what is on screen and changes nothing.
 
 The README screenshots come from Quiet Home's demo mode. A launch with the
 extra `quiet_demo=1` shows the public catalog (packaged as
@@ -423,7 +441,8 @@ layout does not change: one DLL and `res/quiet-home`.
 
 `QuickLaunch.cs` (the settings bridge) and `launcher/probe` are separate
 assemblies outside these layers. Keep them byte-identical: the bridge has no
-update path.
+update path. `launcher/frame` is another separate assembly, a developer tool
+that `tools/frame.py` pushes for one capture and removes.
 
 A key press goes through these steps:
 

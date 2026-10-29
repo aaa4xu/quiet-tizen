@@ -34,6 +34,8 @@ def main():
                      [*common, f"-p:AssemblyName={Path(home_dll).stem}"]))
         jobs.append((ROOT / "launcher/tizen/QuickLaunch.csproj", "QuickLaunch", "QuickLaunch", common))
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
+        # A developer tool for tools/frame.py; it is not packaged.
+        jobs.append((ROOT / "launcher/frame/Frame.csproj", "Frame", "Frame", []))
     for project, output, intermediate, extra in jobs:
         subprocess.run([
             args.dotnet, "build", str(project), "-c", "Release", "--nologo",
