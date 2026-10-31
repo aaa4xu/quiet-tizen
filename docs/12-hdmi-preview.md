@@ -159,8 +159,8 @@ TV's source or pipeline and, with it, the picture mode of the whole screen
    when the launcher goes to the background behind the input, or before the
    next preview if the switch failed.
 7. Mute the input's sound with `IAVControl.MuteAudio(1)` while the launcher is
-   in front and turn it back on with `MuteAudio(0)` when an input opens or the
-   launcher goes to the background.
+   in front. Keep it muted while switching inputs or starting an app, and
+   turn it back on with `MuteAudio(0)` when the launcher goes to the background.
 
 ## Findings on the QE65S95F
 
@@ -259,6 +259,12 @@ point says otherwise.
   picture in the card** for a moment, which the owner saw when opening the
   previewed input. The plane now keeps the card's size until a frame without
   the hole has drawn.
+- **Turning the sound on before the switch played the input before it (30
+  October).** With the computer on screen the owner opened the PlayStation
+  from its card on Home and saw and heard the computer for a moment before
+  the console came. Quiet Home gave the picture and the sound back before
+  `connect_source`. The sound now stays muted through the switch and comes
+  back when Quiet Home goes to the background, as after an app.
 - **Telling a black picture apart without looking.** The video capture refused
   the PlayStation's 4K picture under HDCP 2.x (`IAVControl.GetResolution`
   reported `hdcpType` 2) and worked once HDCP was off on the console. A black
@@ -315,9 +321,10 @@ point says otherwise.
   it. Samsung's home mutes audio and video on resume (decompiled
   `TVServiceController`). Quiet Home mutes with `MuteAudio(1)`.
 - The TV viewer did **not** turn that sound back on: the PlayStation opened
-  silent. Quiet Home calls `MuteAudio(0)` before opening an input and when it
-  goes to the background, not before starting an app (the input's sound
-  played for a couple of seconds while the app started).
+  silent. Quiet Home calls `MuteAudio(0)` when it goes to the background.
+  The sound stays muted while switching inputs or starting an app: unmuting
+  before the switch briefly played the previous input, and unmuting before
+  an app launch played the input for a couple of seconds while the app started.
 - `MuteAudio(1)` answers `0` when the sound is already muted.
 
 ### Not solved
@@ -371,8 +378,9 @@ The decision is in the core and the TV calls are in the host, as
   under the window. Hiding and releasing give the plane back to the viewer's
   window read from vconf. Before an input opens, `HandToViewer` closes the
   hole and marks the window opaque (`HomeView.Cover`), and gives the plane
-  back once the viewer has paused; `Release` (Quiet Home going to the
-  background) or the next preview uncovers it. Every TV service call and size report is appended to
+  back and switches once the viewer has paused, the sound still muted;
+  `Release` (Quiet Home going to the background) or the next preview uncovers
+  it. Every TV service call and size report is appended to
   `/tmp/quiet-preview.txt` (it starts over past 64 KiB).
 - **Demo mode** never previews or mutes, so the demo frames show the cards as
   drawn.
@@ -395,7 +403,8 @@ Build against the TV's own assemblies and install the build as usual
 - Open an app from the dock: no input sound while it starts.
 - Unplug the HDMI device, restart fully, standby and wake: no stale plane.
 - Open an input from its previewed card, from another card, and with Back
-  from the dock: the picture shows each time.
+  from the dock: the picture shows each time. From another card the input on
+  screen before is neither seen nor heard.
 - Turn a console on with its controller while Home previews another input:
   the wide card moves to the console's card within two seconds.
 - Open an input from Quiet Home and leave it alone on a still picture for

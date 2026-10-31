@@ -16,8 +16,9 @@ namespace QuietHome.TizenHost.Platform;
 /// therefore sets once), so every reset it reports is undone at once, and after tying the
 /// plane to the window the hole opens only once the size has held: the owner sees the
 /// picture appear in its card, not a reset. Before an input opens it closes the hole and
-/// covers the TV's viewer with the window, and gives the picture back to the viewer only once
-/// a frame without the hole was drawn and the viewer has paused (see HandToViewer).
+/// covers the TV's viewer with the window, and only once a frame without the hole was drawn
+/// and the viewer has paused gives the picture back and lets the input open, its sound still
+/// muted (see HandToViewer).
 /// </summary>
 sealed class TizenInputPreview : IInputPreview, IDisposable
 {
@@ -165,12 +166,14 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
     /// Quiet Home opens an input: ends the preview, closes the hole and covers the TV's
     /// viewer with the window at once. Once a frame without the hole was drawn
     /// (<see cref="CloseFrameMs"/>) and the viewer reports that it paused, or after
-    /// <see cref="ViewerWaitMs"/>, it gives picture and sound back and runs
+    /// <see cref="ViewerWaitMs"/>, it gives the full-screen picture back and runs
     /// <paramref name="open"/>. Until then the plane keeps the card's size, so no frame shows
-    /// a full-screen picture through the hole. The window stays covered until Quiet Home goes
-    /// to the background (<see cref="Release"/>) or previews again (<see cref="Show"/>): a
-    /// viewer that resumes from a pause under Quiet Home turns the input's sound back on.
-    /// Without the viewer's state (another firmware) it waits only for the frame.
+    /// a full-screen picture through the hole. The sound stays muted through the switch, so the
+    /// input on screen before it is not heard; it comes back when Quiet Home goes to the
+    /// background (<see cref="Release"/>). The window stays covered until then or until Quiet
+    /// Home previews again (<see cref="Show"/>): a viewer that resumes from a pause under Quiet
+    /// Home turns the input's sound back on. Without the viewer's state (another firmware) it
+    /// waits only for the frame.
     /// </summary>
     public void HandToViewer(Action open)
     {
@@ -196,7 +199,7 @@ sealed class TizenInputPreview : IInputPreview, IDisposable
         if (state != null && state != "pause" && waited < ViewerWaitMs)
             return false;
         Note($"viewer {state ?? "unknown"} after {waited} ms");
-        GiveBack(true);
+        GiveBack(false);
         Open();
         return true;
     }

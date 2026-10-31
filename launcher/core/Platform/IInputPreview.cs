@@ -44,10 +44,12 @@ public interface IInputPreview
 
     /// <summary>
     /// Quiet Home is about to open an input in the TV's viewer: ends any preview at once and,
-    /// once its hole is gone from the screen and the viewer below Quiet Home has paused, does
-    /// what <see cref="Release"/> with sound does and runs <paramref name="open"/>, which
-    /// switches the input and starts the viewer; the port may run it later on the UI thread.
-    /// Going full screen only then keeps a stretched picture out of the hole. The viewer turns
+    /// once its hole is gone from the screen and the viewer below Quiet Home has paused, gives
+    /// the TV its full-screen picture back and runs <paramref name="open"/>, which switches the
+    /// input and starts the viewer; the port may run it later on the UI thread. Going full
+    /// screen only then keeps a stretched picture out of the hole. The sound stays muted until
+    /// Quiet Home goes to the background (<see cref="Release"/> with sound): given back before
+    /// the switch, it played the input on screen before it for a moment. The viewer turns
     /// on its TV behaviour only when it resumes from a pause: on the QE65S95F, a viewer opened
     /// from under a launcher it could see through let the TV start its screen saver over the
     /// input after two minutes, as over an app.

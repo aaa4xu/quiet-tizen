@@ -126,13 +126,35 @@ public sealed class PreviewScenarios : IDisposable
         AssertReleasedBeforeLastSwitch();
     }
 
-    /// <summary>Checks that the TV's viewer got the picture and sound back right before the last input switch.</summary>
+    /// <summary>
+    /// Checks that the TV's viewer got the picture back right before the last input switch,
+    /// with the sound still muted.
+    /// </summary>
     void AssertReleasedBeforeLastSwitch()
     {
         int switched = home.Tv.Events.FindLastIndex(e => e.StartsWith("switch"));
         Assert.True(switched > 1);
-        Assert.Equal("release+sound", home.Tv.Events[switched - 2]);
+        Assert.Equal("release", home.Tv.Events[switched - 2]);
         Assert.Equal("viewer", home.Tv.Events[switched - 1]);
+    }
+
+    /// <summary>
+    /// With the console on screen, the owner opens HDMI 3 from its card: the sound stays muted
+    /// through the switch and comes back only once Quiet Home is in the background, so the
+    /// console is not heard before HDMI 3 shows.
+    /// </summary>
+    [Fact]
+    public void AnotherInputOpensWithoutTheSoundOfTheInputBefore()
+    {
+        home.Open();
+        home.Press(RemoteKey.Right);
+        Assert.Equal("HDMI 3", home.Focused);
+        int selected = home.Tv.Events.Count;
+        home.Press(RemoteKey.Select);
+        var opening = home.Tv.Events.GetRange(selected, home.Tv.Events.Count - selected);
+        Assert.Equal(new[] { "release", "viewer", "switch 15", "release", "launch" }, opening);
+        home.Controller.Pause();
+        Assert.Equal("release+sound", home.Tv.Events[^1]);
     }
 
     /// <summary>

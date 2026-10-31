@@ -720,8 +720,10 @@ public sealed class HomeController
     /// <summary>
     /// Switches the TV to input <paramref name="source"/> and opens its picture; a failure is
     /// shown and recorded. The preview ends first, and the TV's viewer gets the full-screen
-    /// picture and sound back once the preview's hole is gone and the viewer has paused (see
-    /// <see cref="IInputPreview.HandToViewer"/>), so the switch happens a moment later.
+    /// picture back once the preview's hole is gone and the viewer has paused (see
+    /// <see cref="IInputPreview.HandToViewer"/>), so the switch happens a moment later. The
+    /// sound comes back only when Quiet Home goes to the background (<see cref="Pause"/>),
+    /// after the switch, so the input on screen before it is not heard.
     /// </summary>
     void SelectSource(int source)
     {

@@ -246,12 +246,12 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
 
     /// <summary>
     /// Records that Quiet Home gave the screen to the TV's viewer, ending any preview, as
-    /// "release+sound" and "viewer", then opens the input at once, or keeps it back while
-    /// <see cref="HoldViewer"/> is set.
+    /// "release" (the sound stays muted) and "viewer", then opens the input at once, or keeps
+    /// it back while <see cref="HoldViewer"/> is set.
     /// </summary>
     public void HandToViewer(Action open)
     {
-        Release(true);
+        Release(false);
         Events.Add("viewer");
         if (HoldViewer)
             PendingOpen = open;
