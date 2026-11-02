@@ -204,6 +204,6 @@ static class Layout
     /// <summary>Top edge of the toolbar buttons.</summary>
     public const int ToolbarY = 69;
 
-    /// <summary>Returns the left edge of the toolbar button at <paramref name="position"/> (-1 for "Edit inputs").</summary>
-    public static int ToolbarX(int position) => 1596 + position * 88;
+    /// <summary>Returns the left edge of the toolbar button at <paramref name="position"/> (-1 for "Edit inputs", 3 for "Ambilight").</summary>
+    public static int ToolbarX(int position) => 1524 + position * 84;
 }

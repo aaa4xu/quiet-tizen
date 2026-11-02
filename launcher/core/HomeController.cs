@@ -36,6 +36,7 @@ public sealed class HomeController
     readonly DemoCecDevices demoCec = new();
     DemoQuickSettings demoSettings = new();
     DemoThemeStore demoTheme = new();
+    readonly DemoAmbilight demoAmbilight = new();
 
     List<LibraryApp> library = new();
     List<LibraryApp> ownLibrary = new();
@@ -61,6 +62,9 @@ public sealed class HomeController
     // front again. The TV's notices still redraw the page meanwhile, but a preview then would
     // take the TV's picture back to a window nobody sees, and the opened input stayed black.
     bool away;
+    // The ambilight sender's state, read before drawing the Home toolbar.
+    bool ambilightOn;
+    bool ambilightAvailable;
 
     /// <summary>
     /// Creates the controller and subscribes to the TV's input and CEC changes and preview failures.
@@ -98,6 +102,8 @@ public sealed class HomeController
 
     ICecDevices Cec => demo ? demoCec : tv.Cec;
 
+    IAmbilight Ambilight => demo ? demoAmbilight : tv.Ambilight;
+
     /// <summary>
     /// Starts the app: loads the owner's catalog and theme, starts loading artwork, shows
     /// the Home page with the input on screen focused and mutes the input's sound.
@@ -118,6 +124,14 @@ public sealed class HomeController
         RefreshCec();
         RefreshSource();
         navigator.Selected = SourceIndex();
+        try
+        {
+            Ambilight.Restore();
+        }
+        catch (Exception)
+        {
+            // The sender can be started again from the toolbar.
+        }
         Rebuild();
         SilenceInput();
         WriteState("created");
@@ -207,6 +221,11 @@ public sealed class HomeController
     {
         away = false;
         bool changed = ApplyLaunchOptions(options);
+        if (options.Ambilight is bool ambilight)
+        {
+            SetAmbilight(ambilight);
+            changed = true;
+        }
         SilenceInput();
         if (options.Page == Page.Settings)
         {
@@ -445,6 +464,63 @@ public sealed class HomeController
     /// <summary>Reads the stored theme: dark unless "light" is stored.</summary>
     void LoadTheme() => dark = ThemeSetting.IsDark(ThemeStore.Read());
 
+    /// <summary>
+    /// Starts the ambilight sender when it is off and stops it when it is on, then redraws
+    /// the toolbar with its new state. A missing program or a failing start/stop is shown as
+    /// a notice and recorded; the sender itself decides whether it was left on for the next
+    /// start of Quiet Home.
+    /// </summary>
+    void ToggleAmbilight()
+    {
+        bool available;
+        bool wasOn;
+        try
+        {
+            available = Ambilight.Available;
+            wasOn = Ambilight.IsOn;
+        }
+        catch (Exception)
+        {
+            available = false;
+            wasOn = false;
+        }
+        if (!available)
+        {
+            ShowError("Ambilight is not installed.");
+            WriteState("ambilight:unavailable");
+            return;
+        }
+        bool ok;
+        try
+        {
+            ok = wasOn ? Ambilight.Stop() : Ambilight.Start();
+        }
+        catch (Exception)
+        {
+            ok = false;
+        }
+        Rebuild();
+        if (!ok)
+            ShowError(wasOn ? "Ambilight could not be stopped." : "Ambilight could not be started.");
+        WriteState("ambilight:" + (wasOn ? "off" : "on") + ":" + ok);
+    }
+
+    /// <summary>Starts or stops the sender for a launch request that names a state; failures leave the actual state as it is.</summary>
+    void SetAmbilight(bool on)
+    {
+        try
+        {
+            if (on && !Ambilight.IsOn)
+                Ambilight.Start();
+            else if (!on && Ambilight.IsOn)
+                Ambilight.Stop();
+        }
+        catch (Exception)
+        {
+            // The toolbar shows the sender's actual state after the rebuild.
+        }
+    }
+
     /// <summary>Switches between dark and light, saves the choice and redraws; a failed save is shown and recorded.</summary>
     void ToggleTheme()
     {
@@ -468,9 +544,28 @@ public sealed class HomeController
     string ClockNow() => ClockText.Format(Clock.Now, CultureInfo.CurrentCulture);
 
     /// <summary>Returns the screen for the current state.</summary>
-    HomeScreen BuildScreen() => ScreenBuilder.Build(new ScreenState(
-        navigator.Page, navigator.Zone, navigator.Selected, navigator.LibraryPage, navigator.Adjusting,
-        dark, inputSources, library, settings, ClockNow()));
+    HomeScreen BuildScreen()
+    {
+        RefreshAmbilight();
+        return ScreenBuilder.Build(new ScreenState(
+            navigator.Page, navigator.Zone, navigator.Selected, navigator.LibraryPage, navigator.Adjusting,
+            dark, inputSources, library, settings, ClockNow(), ambilightOn, ambilightAvailable));
+    }
+
+    /// <summary>Reads whether the ambilight sender is installed and running; a failing port reads as unavailable and off.</summary>
+    void RefreshAmbilight()
+    {
+        try
+        {
+            ambilightAvailable = Ambilight.Available;
+            ambilightOn = Ambilight.IsOn;
+        }
+        catch (Exception)
+        {
+            ambilightAvailable = false;
+            ambilightOn = false;
+        }
+    }
 
     /// <summary>
     /// Draws the current page from scratch. Arriving at Home without a fresh reading reads the
@@ -652,6 +747,9 @@ public sealed class HomeController
                 return;
             case HomeAction.ToggleTheme:
                 ToggleTheme();
+                return;
+            case HomeAction.ToggleAmbilight:
+                ToggleAmbilight();
                 return;
         }
     }
@@ -840,6 +938,7 @@ public sealed class HomeController
                 GameMode = settings.Value(settings.GameModeId),
                 SleepTimer = settings.Value("sleeptimer"),
                 Preview = preview,
+                Ambilight = !ambilightAvailable ? "unavailable" : ambilightOn ? "on" : "off",
             }.Format(DateTime.UtcNow));
         }
         catch (Exception)

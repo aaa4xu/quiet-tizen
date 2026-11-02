@@ -41,4 +41,7 @@ public abstract record HomeAction
 
     /// <summary>Switch between the dark and the light theme and save the choice.</summary>
     public sealed record ToggleTheme : HomeAction;
+
+    /// <summary>Start or stop the WLED ambilight sender (see <see cref="Platform.IAmbilight"/>).</summary>
+    public sealed record ToggleAmbilight : HomeAction;
 }

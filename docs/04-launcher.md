@@ -226,8 +226,9 @@ extra `quiet_demo=1` shows the public catalog (packaged as
 clock. Settings and the theme changed during a demo stay in memory and change
 nothing on the TV; each demo starts from the same values. `quiet_theme=light|dark` picks a theme without saving it, and
 `quiet_page=home|apps|settings` a page, and `quiet_focus=toolbar` puts the focus
-on the page's first toolbar button. Any launch without `quiet_demo`
-returns to the normal state. Demo mode never shows an input preview and leaves the
+on the page's first toolbar button; `quiet_ambilight=on|off` starts or stops the
+WLED sender (demo mode only changes its in-memory state). Any launch without
+`quiet_demo` returns to the normal state. Demo mode never shows an input preview and leaves the
 sound alone. With the launcher installed, refresh all six
 images with:
 
@@ -399,6 +400,42 @@ applies inside Quiet Home only; changing it cannot fix input lag inside Netflix.
 Local diagnostic files retain only current launcher state and are overwritten;
 the launcher has no telemetry/network client.
 
+## Ambilight sender on the TV
+
+The private capture API, buffer layout and library offsets come from experiments
+on the QE65S95F (`T-RSMFDEUC-0090-1301.0`). Other builds need separate validation.
+
+The launcher package also contains `quiet-home/ambilight/AmbilightLoop.dll` and
+`quiet-home/ambilight.json`. The sender captures the TV's MAIN video plane,
+samples the LED zones from the real picture (skipping letterbox bars) and sends
+the colours to WLED over DDP. On the Home page the toolbar's power button starts
+and stops it; its label reads **Ambilight on** or **Ambilight off**. The sender
+is a separate process, so it keeps running while Quiet Home is in the background,
+for example while a streaming app or an input is on screen.
+
+Quiet Home starts the sender at boot when the owner left it on; the choice is
+kept in the container's data directory (`ambilight.state`). The app adds the
+SMACK rule that lets its label execute `/usr/bin/dotnet` before the first start;
+the rule is runtime state, so the app adds it again after every restart. No root
+session is needed. The sender writes its log to `/tmp/ambilight_loop.log`.
+
+`ambilight.json` holds the device-specific values:
+
+| Key | Meaning |
+|---|---|
+| `wled_ip` | WLED device address |
+| `ddp_port` | DDP port, 4048 by default |
+| `led_count` | LEDs on the strip |
+| `bottom_end`, `left_end`, `top_end` | Strip boundaries confirmed with a test pattern (0 = bottom-right) |
+
+Copy the example to the ignored `launcher/assets/ambilight.local.json`, replace
+the documentation address `192.0.2.50` with the owner's WLED address and check
+the LED layout. Rebuild with `python3 tools/build.py launcher ...`; the build
+copies the local configuration over the packaged `ambilight.json`. The example
+layout is the QE65S95F's 252-LED strip. A launch request
+can also set the state without the remote: `quiet_ambilight=on` or
+`quiet_ambilight=off`.
+
 ## How the code is organized
 
 Quiet Home's source has two layers, and `launcher/tizen/Home.csproj`
@@ -445,7 +482,9 @@ layout does not change: one DLL and `res/quiet-home`.
 `QuickLaunch.cs` (the settings bridge) and `launcher/probe` are separate
 assemblies outside these layers. Keep them byte-identical: the bridge has no
 update path. `launcher/frame` is another separate assembly, a developer tool
-that `tools/frame.py` pushes for one capture and removes.
+that `tools/frame.py` pushes for one capture and removes. `launcher/ambilight`
+is the MAIN-plane WLED sender packaged under `quiet-home/ambilight` and started
+by Quiet Home's Home toolbar.
 
 A key press goes through these steps:
 

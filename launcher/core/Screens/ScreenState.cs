@@ -20,6 +20,8 @@ namespace QuietHome.Core.Screens;
 /// <param name="Library">The catalog in use (the owner's, or the public one in demo mode).</param>
 /// <param name="Settings">The latest quick settings values.</param>
 /// <param name="Clock">The clock text.</param>
+/// <param name="AmbilightOn">True when the WLED ambilight sender is running.</param>
+/// <param name="AmbilightAvailable">True when the sender is installed and can be toggled.</param>
 public sealed record ScreenState(
     Page Page,
     Zone Zone,
@@ -30,4 +32,6 @@ public sealed record ScreenState(
     IReadOnlyList<InputSource> Inputs,
     IReadOnlyList<LibraryApp> Library,
     QuickSettingsState Settings,
-    string Clock);
+    string Clock,
+    bool AmbilightOn,
+    bool AmbilightAvailable);

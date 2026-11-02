@@ -10,7 +10,8 @@ namespace QuietHome.Core;
 /// <c>quiet_demo=1</c> turns demo mode on (any launch without it turns it off),
 /// <c>quiet_theme=light|dark</c> overrides the theme until demo mode ends,
 /// <c>quiet_page=apps|settings</c> opens that page and <c>quiet_focus=toolbar</c> puts the
-/// focus on the page's first toolbar button. The README screenshot recipe uses all four.
+/// focus on the page's first toolbar button. <c>quiet_ambilight=on|off</c> starts or stops
+/// the WLED sender without using the toolbar. The README screenshot recipe uses the first four.
 /// </summary>
 public sealed class LaunchOptions
 {
@@ -26,13 +27,17 @@ public sealed class LaunchOptions
     /// <summary>True when the request asks for the focus on the first toolbar button instead of the page's first card.</summary>
     public bool FocusToolbar { get; }
 
+    /// <summary>The requested ambilight state: true for on, false for off, null when the request names none or an unknown one.</summary>
+    public bool? Ambilight { get; }
+
     /// <summary>Creates options; use <see cref="Parse"/> to read them from a request.</summary>
-    LaunchOptions(bool demo, bool? dark, Page page, bool focusToolbar)
+    LaunchOptions(bool demo, bool? dark, Page page, bool focusToolbar, bool? ambilight)
     {
         Demo = demo;
         Dark = dark;
         Page = page;
         FocusToolbar = focusToolbar;
+        Ambilight = ambilight;
     }
 
     /// <summary>
@@ -48,7 +53,8 @@ public sealed class LaunchOptions
             "apps" => Page.Apps,
             _ => Page.Home,
         };
+        string? ambilight = extra("quiet_ambilight");
         return new LaunchOptions(extra("quiet_demo") == "1", theme == "dark" ? true : theme == "light" ? false : null, page,
-            extra("quiet_focus") == "toolbar");
+            extra("quiet_focus") == "toolbar", ambilight == "on" ? true : ambilight == "off" ? false : null);
     }
 }

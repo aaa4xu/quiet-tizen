@@ -44,7 +44,8 @@ public sealed class QuietHomeApplication : NUIApplication
         cec = new TizenCecDevices();
         var view = new HomeView(root);
         preview = new TizenInputPreview(view);
-        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile(), preview, cec);
+        var ambilight = new TizenAmbilight(root + "ambilight/AmbilightLoop.dll", root + "ambilight.json", DirectoryInfo.Data);
+        var ports = new HomePorts(inputs, new TizenQuickSettings(), new FileThemeStore(DirectoryInfo.Data), new SystemClock(), new TizenSystemLauncher(), new StateFile(), preview, cec, ambilight);
         var home = new HomeController(ports, view, new HomeConfig(root + "apps.json", root + "apps.public.json", demoInputs));
         controller = home;
         Window.Default.Title = "Quiet Home";

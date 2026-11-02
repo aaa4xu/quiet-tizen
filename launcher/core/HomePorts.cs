@@ -15,6 +15,7 @@ namespace QuietHome.Core;
 /// <param name="Diagnostics">The diagnostics file.</param>
 /// <param name="Preview">The live picture of an input inside its card.</param>
 /// <param name="Cec">The HDMI-CEC devices on the inputs.</param>
+/// <param name="Ambilight">The WLED ambilight sender on the TV.</param>
 public sealed record HomePorts(
     IInputSources Inputs,
     IQuickSettings QuickSettings,
@@ -23,4 +24,5 @@ public sealed record HomePorts(
     ISystemLauncher Launcher,
     IDiagnostics Diagnostics,
     IInputPreview Preview,
-    ICecDevices Cec);
+    ICecDevices Cec,
+    IAmbilight Ambilight);

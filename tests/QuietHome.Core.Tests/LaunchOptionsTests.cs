@@ -20,6 +20,7 @@ public class LaunchOptionsTests
         Assert.Null(options.Dark);
         Assert.Equal(Page.Home, options.Page);
         Assert.False(options.FocusToolbar);
+        Assert.Null(options.Ambilight);
     }
 
     /// <summary>The README screenshot recipe's request: demo mode, a theme, a page and the toolbar focus.</summary>
@@ -44,5 +45,15 @@ public class LaunchOptionsTests
         Assert.Null(options.Dark);
         Assert.Equal(Page.Home, options.Page);
         Assert.False(options.FocusToolbar);
+        Assert.Null(options.Ambilight);
+    }
+
+    /// <summary>quiet_ambilight=on and quiet_ambilight=off name the sender's state; other values change nothing.</summary>
+    [Fact]
+    public void AmbilightState()
+    {
+        Assert.True(Parse(new() { ["quiet_ambilight"] = "on" }).Ambilight);
+        Assert.False(Parse(new() { ["quiet_ambilight"] = "off" }).Ambilight);
+        Assert.Null(Parse(new() { ["quiet_ambilight"] = "toggle" }).Ambilight);
     }
 }

@@ -100,8 +100,9 @@ public static class ScreenBuilder
 
     /// <summary>
     /// Returns the toolbar: "Edit inputs" on the Home page only (it opens Samsung's source
-    /// list, where an input's name and type are edited), then Apps, Inputs and Settings.
-    /// Their slots follow the page's <paramref name="firstSlot"/> cards.
+    /// list, where an input's name and type are edited), then Apps, Inputs, Settings and the
+    /// Ambilight toggle (Home page only, when its program is installed). Their slots follow
+    /// the page's <paramref name="firstSlot"/> cards.
     /// </summary>
     static List<ToolbarButtonModel> Toolbar(ScreenState state, int firstSlot)
     {
@@ -111,6 +112,12 @@ public static class ScreenBuilder
         buttons.Add(new ToolbarButtonModel(0, "Apps", "apps", new HomeAction.ShowPage(Page.Apps)));
         buttons.Add(new ToolbarButtonModel(1, "Inputs", "hdmi", new HomeAction.ShowPage(Page.Home)));
         buttons.Add(new ToolbarButtonModel(2, "Settings", "settings", new HomeAction.ShowPage(Page.Settings)));
+        if (state.Page == Page.Home && state.AmbilightAvailable)
+        {
+            buttons.Add(new ToolbarButtonModel(3,
+                state.AmbilightOn ? "Ambilight on" : "Ambilight off",
+                "power", new HomeAction.ToggleAmbilight()));
+        }
         return buttons.Select((b, i) => b with { Focused = IsFocused(state, firstSlot + i) }).ToList();
     }
 

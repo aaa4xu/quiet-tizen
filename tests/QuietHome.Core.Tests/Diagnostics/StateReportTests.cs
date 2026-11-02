@@ -26,7 +26,7 @@ public class StateReportTests
             "build_ms", "library_page", "library_count", "library_error", "inputs", "input_error", "source_callback",
             "selected_name", "artwork_cached", "artwork_ready", "artwork_pending", "artwork_views_created",
             "page_artwork_cold", "process_id", "editing", "volume", "brightness", "game-mode", "sleeptimer", "preview",
-            "input_states",
+            "input_states", "ambilight",
         }, lines[1..^1].Select(l => l.Split('=')[0]));
     }
 

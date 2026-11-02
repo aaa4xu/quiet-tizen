@@ -105,6 +105,9 @@ public sealed class StateReport
     /// </summary>
     public string InputStates { get; set; } = "";
 
+    /// <summary>Line <c>ambilight=</c>: "on", "off" or "unavailable". Added last for the same reason.</summary>
+    public string Ambilight { get; set; } = "";
+
     /// <summary>
     /// Returns the file's text: <paramref name="utcNow"/> in round-trip format, then every
     /// line in the fixed order, each ending with a newline. Booleans read "True" / "False".
@@ -142,5 +145,6 @@ public sealed class StateReport
         + "\nsleeptimer=" + SleepTimer
         + "\npreview=" + Platform.PreviewStateNames.Name(Preview)
         + "\ninput_states=" + InputStates
+        + "\nambilight=" + Ambilight
         + "\n";
 }

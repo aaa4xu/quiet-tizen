@@ -60,7 +60,7 @@ public sealed record SettingsTileModel(SettingsTile Tile, string? Value)
     : CardModel(Tile.Row, Tile.Title, Tile.Hint, Tile.Action);
 
 /// <summary>A round button in the toolbar at the top right of every page.</summary>
-/// <param name="Position">Place in the toolbar: -1 for "Edit inputs" (Home page only), then 0, 1, 2 from left to right.</param>
+/// <param name="Position">Place in the toolbar: -1 for "Edit inputs" (Home page only), then 0, 1, 2, and 3 for "Ambilight" (Home page only).</param>
 /// <param name="Name">The button's name, shown next to it while it has focus.</param>
 /// <param name="Icon">Icon name; the artwork file is <c>symbol-{Icon}.png</c>.</param>
 /// <param name="Action">What Select on it does.</param>

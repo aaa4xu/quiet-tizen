@@ -36,6 +36,8 @@ def main():
         jobs.append((ROOT / "launcher/probe/Probe.csproj", "Probe", "Probe", []))
         # A developer tool for tools/frame.py; it is not packaged.
         jobs.append((ROOT / "launcher/frame/Frame.csproj", "Frame", "Frame", []))
+        # The MAIN-only WLED sender, packaged under quiet-home/ambilight and started by Quiet Home.
+        jobs.append((ROOT / "launcher/ambilight/AmbilightLoop.csproj", "Ambilight", "Ambilight", []))
     for project, output, intermediate, extra in jobs:
         subprocess.run([
             args.dotnet, "build", str(project), "-c", "Release", "--nologo",
@@ -55,12 +57,19 @@ def main():
         shutil.copyfile(ROOT / ".local/build/Probe/Probe.dll", destination / "Probe.dll")
         assets = destination / "quiet-home"
         shutil.copytree(ROOT / "launcher/assets", assets)
+        ambilight = assets / "ambilight"
+        ambilight.mkdir()
+        shutil.copyfile(ROOT / ".local/build/Ambilight/AmbilightLoop.dll", ambilight / "AmbilightLoop.dll")
         # Demo mode (README screenshots) shows the public catalog even when a local one is used.
         shutil.copyfile(assets / "apps.json", assets / "apps.public.json")
         local_catalog = ROOT / "launcher/assets/apps.local.json"
         if local_catalog.exists():
             shutil.copyfile(local_catalog, assets / "apps.json")
+        local_ambilight = ROOT / "launcher/assets/ambilight.local.json"
+        if local_ambilight.exists():
+            shutil.copyfile(local_ambilight, assets / "ambilight.json")
         (assets / "apps.local.json").unlink(missing_ok=True)
+        (assets / "ambilight.local.json").unlink(missing_ok=True)
         print("Deployable files: .local/package/. Review the app catalog before use.")
 
 

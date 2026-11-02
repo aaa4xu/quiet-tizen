@@ -13,7 +13,7 @@ namespace QuietHome.Core.Tests.Fakes;
 /// what fails, then check what the controller asked of it. The Tizen implementations it
 /// replaces live in launcher/tizen/Platform. Used through <see cref="HomeHarness"/>.
 /// </summary>
-sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics, IInputPreview, ICecDevices
+sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISystemLauncher, IDiagnostics, IInputPreview, ICecDevices, IAmbilight
 {
     /// <summary>Creates the TV with a brightness of 30 and the sleep timer off.</summary>
     public FakeTv()
@@ -23,7 +23,7 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     }
 
     /// <summary>The ports bundle over this TV.</summary>
-    public HomePorts Ports => new(this, this, this, this, this, this, this, this);
+    public HomePorts Ports => new(this, this, this, this, this, this, this, this, this);
 
     /// <summary>The connected inputs.</summary>
     public List<InputSource> Inputs { get; set; } = new();
@@ -138,8 +138,12 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
         Reads++;
         return new InputReading(Inputs.ConvertAll(s => new InputSource
         {
-            ConnectionState = s.ConnectionState, DetectedName = s.DetectedName, EditName = s.EditName,
-            IconPath = s.IconPath, SourceType = s.SourceType, PowerState = s.PowerState,
+            ConnectionState = s.ConnectionState,
+            DetectedName = s.DetectedName,
+            EditName = s.EditName,
+            IconPath = s.IconPath,
+            SourceType = s.SourceType,
+            PowerState = s.PowerState,
         }), "");
     }
 
@@ -261,4 +265,56 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
 
     /// <summary>Keeps the diagnostics text.</summary>
     void IDiagnostics.Write(string text) => State = text;
+
+    /// <summary>True when the fake ambilight sender is installed; tests clear it to check the missing-program path.</summary>
+    public bool AmbilightAvailable { get; set; } = true;
+
+    /// <summary>True while the fake sender is running.</summary>
+    public bool AmbilightOn { get; private set; }
+
+    /// <summary>Start, stop and restore calls, in order.</summary>
+    public List<string> AmbilightEvents { get; } = new();
+
+    /// <summary>When true, <see cref="Start"/> records the call and reports failure without turning on.</summary>
+    public bool AmbilightStartFails { get; set; }
+
+    /// <summary>When true, <see cref="Stop"/> records the call and reports failure without turning off.</summary>
+    public bool AmbilightStopFails { get; set; }
+
+    /// <summary>When true, <see cref="Restore"/> starts the fake sender, as a saved "on" preference would.</summary>
+    public bool AmbilightWantsOn { get; set; }
+
+    /// <summary>Reports whether the fake sender is installed.</summary>
+    bool IAmbilight.Available => AmbilightAvailable;
+
+    /// <summary>Reports whether the fake sender is running.</summary>
+    bool IAmbilight.IsOn => AmbilightOn;
+
+    /// <summary>Records the start and turns the fake sender on unless <see cref="AmbilightStartFails"/> is set.</summary>
+    public bool Start()
+    {
+        AmbilightEvents.Add("start");
+        if (AmbilightStartFails)
+            return false;
+        AmbilightOn = true;
+        return true;
+    }
+
+    /// <summary>Records the stop and turns the fake sender off unless <see cref="AmbilightStopFails"/> is set.</summary>
+    public bool Stop()
+    {
+        AmbilightEvents.Add("stop");
+        if (AmbilightStopFails)
+            return false;
+        AmbilightOn = false;
+        return true;
+    }
+
+    /// <summary>Records the restore and starts the fake sender when <see cref="AmbilightWantsOn"/> is set.</summary>
+    public void Restore()
+    {
+        AmbilightEvents.Add("restore");
+        if (AmbilightWantsOn)
+            Start();
+    }
 }

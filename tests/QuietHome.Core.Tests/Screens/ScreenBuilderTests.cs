@@ -35,7 +35,7 @@ public class ScreenBuilderTests
 
     /// <summary>Returns a state on <paramref name="page"/> with focus in <paramref name="zone"/> at slot <paramref name="selected"/>.</summary>
     static ScreenState State(Page page, Zone zone, int selected, IReadOnlyList<LibraryApp> library, int libraryPage = 0, Adjustment adjusting = Adjustment.None) =>
-        new(page, zone, selected, libraryPage, adjusting, true, TwoInputs(), library, new QuickSettingsState(), "9:41 AM");
+        new(page, zone, selected, libraryPage, adjusting, true, TwoInputs(), library, new QuickSettingsState(), "9:41 AM", false, false);
 
     /// <summary>The Home page lists the inputs, the dock's first five real apps and "Your Apps", then the toolbar with "Edit inputs" first.</summary>
     [Fact]
