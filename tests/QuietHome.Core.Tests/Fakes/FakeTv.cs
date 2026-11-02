@@ -110,17 +110,17 @@ sealed class FakeTv : IInputSources, IQuickSettings, IThemeStore, IClock, ISyste
     public int CecReads { get; private set; }
 
     // Raised by RaiseCecChanged; named apart from the input list's notice, which has the same event name.
-    event Action? cecChanged;
+    event Action? CecChanged;
 
     /// <summary>Raised by <see cref="RaiseCecChanged"/>.</summary>
     event Action? ICecDevices.Changed
     {
-        add => cecChanged += value;
-        remove => cecChanged -= value;
+        add => CecChanged += value;
+        remove => CecChanged -= value;
     }
 
     /// <summary>Simulates the TV's notice that its CEC device list changed.</summary>
-    public void RaiseCecChanged() => cecChanged?.Invoke();
+    public void RaiseCecChanged() => CecChanged?.Invoke();
 
     /// <summary>Counts the read and returns a copy of <see cref="CecInputs"/>.</summary>
     IReadOnlySet<int> ICecDevices.Inputs()

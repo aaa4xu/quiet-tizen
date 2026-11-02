@@ -8,7 +8,7 @@ using Xunit;
 namespace QuietHome.Core.Tests.Scenarios;
 
 /// <summary>
-/// Scenario tests of the input preview (<see cref="Platform.IInputPreview"/>): which focus
+/// Scenario tests of the input preview (<see cref="QuietHome.Core.Platform.IInputPreview"/>): which focus
 /// shows the live picture of the input on screen in its card, when it is put away and when
 /// the input's sound is muted, played with the remote on <see cref="HomeHarness"/>. They
 /// check what was asked of the TV, not the picture.
