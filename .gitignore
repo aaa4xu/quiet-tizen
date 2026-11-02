@@ -21,3 +21,4 @@ __pycache__/
 *.tar.*
 launcher/assets/app-icons/
 launcher/assets/apps.local.json
+launcher/assets/ambilight.local.json

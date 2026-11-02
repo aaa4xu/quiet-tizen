@@ -1,0 +1,8 @@
+{
+  "wled_ip": "192.0.2.50",
+  "ddp_port": 4048,
+  "led_count": 252,
+  "bottom_end": 81,
+  "left_end": 126,
+  "top_end": 207
+}
