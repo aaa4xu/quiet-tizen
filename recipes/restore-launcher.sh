@@ -7,6 +7,7 @@ test "$(id -u)" = 0
 name=${1:?}; operation=${2:?}; home=${3:?}; startup=${4:?}
 case "$name" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
 D=/opt/usr/share/quiet-tizen-backups/$name
+test ! -e "$D/update-pending" || { echo 'Recover the interrupted update with update-launcher.sh recover first' >&2; exit 1; }
 if [ -s "$D/launcher-container.txt" ]; then
     read -r container dll < "$D/launcher-container.txt"
     if [ -n "${5:-}" ]; then test "$container $dll" = "$5 ${6:-}"; fi

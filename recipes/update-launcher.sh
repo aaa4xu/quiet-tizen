@@ -1,137 +1,134 @@
 #!/bin/sh
-# Replace an installed Quiet Home with a new local build, roll one update back,
-# or remove old updates.
-# apply|rollback SNAPSHOT_NAME UPDATE_NAME
-# prune SNAPSHOT_NAME KEEP
-# SNAPSHOT_NAME: the snapshot install-launcher.sh used. For apply, stage
-# .local/package.tar.gz as quiet-tizen/package.tar.gz first. prune keeps the
-# installed update and the KEEP - 1 updates below it, and removes every other
-# update, rolled back ones included.
-# Samsung's original container in the snapshot is never touched here.
+# apply|recover SNAPSHOT_NAME. Stage package.tar.gz before apply.
+# The only temporary copy is for recovering an interrupted file replacement.
+# Original Samsung files and registry snapshots stay in the installation snapshot.
 set -eu
 test "$(id -u)" = 0
 umask 077
-action=${1:?apply, rollback or prune}; name=${2:?Snapshot name required}; update=${3:?Update name required}
-for value in "$name" "$update"; do
-    case "$value" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
-done
+test "$#" = 2 || { echo 'Usage: update-launcher.sh apply|recover SNAPSHOT' >&2; exit 1; }
+action=$1; name=$2
+case "$action" in apply|recover) ;; *) exit 1;; esac
+case "$name" in ''|*[!A-Za-z0-9_-]*) exit 1;; esac
 D=/opt/usr/share/quiet-tizen-backups/$name
-U=$D/updates/$update
-# The update installed now; empty after rolling back to the build install-launcher.sh
-# installed. Missing for snapshots whose updates came before this record.
-I=$D/installed-update
-test -s "$D/launcher-container.txt" || { echo 'This snapshot has no container record; use the one Quiet Home was installed from' >&2; exit 1; }
+T=$D/update-pending
+S=/home/owner/share/tmp/sdk_tools/quiet-tizen
+test -s "$D/launcher-container.txt"
 read -r container dll < "$D/launcher-container.txt"
 for value in "$container" "$dll"; do
     case "$value" in ''|.*|*[!A-Za-z0-9_.-]*) exit 1;; esac
 done
 if [ -n "${QUIET_LAUNCHER_APP:-}" ]; then
-    test "$container $dll" = "$QUIET_LAUNCHER_APP ${QUIET_LAUNCHER_DLL:-}" || { echo "The snapshot backed up $container, not the profile's launcher" >&2; exit 1; }
+    test "$container $dll" = "$QUIET_LAUNCHER_APP ${QUIET_LAUNCHER_DLL:-}" || { echo 'Snapshot and profile name different containers' >&2; exit 1; }
 fi
 A=/opt/usr/apps/$container
 label=User::Pkg::$container::RO
-S=/home/owner/share/tmp/sdk_tools/quiet-tizen
-test -s "$D/installed-home.sha256" || { echo 'Quiet Home was not installed from this snapshot' >&2; exit 1; }
-test -d "$A/res/quiet-home" || { echo "Quiet Home is not installed in $container" >&2; exit 1; }
-# Stop if anything else, for example a vendor app update, replaced the installed launcher.
-sha256sum -c "$D/installed-home.sha256" || { echo "$dll is not the Quiet Home build this snapshot installed" >&2; exit 1; }
-# install-launcher.sh moved the cached native image away; a new one would run instead of the DLL.
-test ! -e "$A/bin/.native_image" || { echo "$A/bin/.native_image would shadow the new DLL" >&2; exit 1; }
+test ! -L "$T"
+test ! -e "$A/bin/.native_image" || { echo 'A cached native image would shadow the DLL' >&2; exit 1; }
+
+# Return a file digest or the sorted contents of a resource directory.
+digest() { sha256sum "$1" | cut -d ' ' -f 1; }
+tree() {
+    test -d "$1" && test ! -L "$1" || return 1
+    unusual=$(find "$1" ! -type f ! -type d -print) || return 1
+    test -z "$unusual" || return 1
+    (cd "$1" && contents=$(find . -type f -exec sha256sum {} +) && printf '%s\n' "$contents" | LC_ALL=C sort)
+}
+check_tree() {
+    actual=$(tree "$1") || return 1
+    expected=$(cat "$2") || return 1
+    test "$actual" = "$expected"
+}
+
+# Finish a committed replacement, or return an interrupted one to its initial state.
+# Every failure keeps the pending directory for inspection.
+recover() {
+    test -d "$T" || return 0
+    if [ ! -e "$T/ready" ]; then
+        sha256sum -c "$D/installed-home.sha256" || return 1
+        rm -rf "$T"
+        return
+    fi
+    test -s "$D/installed-home.sha256" && test -s "$T/old.sha256" && test -s "$T/new.sha256" || return 1
+    recorded=$(cat "$D/installed-home.sha256") || return 1
+    test "$recorded" = "$(cat "$T/old.sha256")" || test "$recorded" = "$(cat "$T/new.sha256")" || return 1
+    if [ -e "$T/commit" ]; then
+        sha256sum -c "$T/new.sha256" || return 1
+        check_tree "$A/res/quiet-home" "$T/new.resources" || return 1
+        cp "$T/new.sha256" "$T/committed.sha256" || return 1
+        mv "$T/committed.sha256" "$D/installed-home.sha256" || return 1
+        rm -f "$T/ready" || return 1
+        rm -rf "$T"
+        return
+    fi
+    test "$recorded" = "$(cat "$T/old.sha256")" || return 1
+    old=$(cut -d ' ' -f 1 "$T/old.sha256")
+    new=$(cut -d ' ' -f 1 "$T/new.sha256")
+    test "$(digest "$T/old.dll")" = "$old" || return 1
+    live=$(digest "$A/bin/$dll")
+    test "$live" = "$old" || test "$live" = "$new" || return 1
+    if [ -d "$T/old-resources" ]; then
+        check_tree "$T/old-resources" "$T/old.resources" || return 1
+        if [ -e "$A/res/quiet-home" ]; then
+            check_tree "$A/res/quiet-home" "$T/new.resources" || return 1
+        fi
+    else
+        check_tree "$A/res/quiet-home" "$T/old.resources" || return 1
+    fi
+    app_launcher -u 5001 -k "$container" || true
+    cp -a "$T/old.dll" "$T/restoring.dll" || return 1
+    chsmack -a "$label" "$T/restoring.dll" || return 1
+    mv "$T/restoring.dll" "$A/bin/$dll" || return 1
+    if [ -d "$T/old-resources" ]; then
+        rm -rf "$A/res/quiet-home" || return 1
+        mv "$T/old-resources" "$A/res/quiet-home" || return 1
+    fi
+    app_launcher -u 5001 -s "$container" || return 1
+    rm -f "$T/ready" || return 1
+    rm -rf "$T"
+}
+
+if [ -e "$T" ]; then recover; fi
+if [ "$action" = recover ]; then echo 'No interrupted update remains'; exit 0; fi
+sha256sum -c "$D/installed-home.sha256" || { echo 'Installed DLL changed outside Quiet Home; inspect it before updating' >&2; exit 1; }
+test "$(stat -c %u:%g "$A/bin/$dll")" = 201:0
 mode=$(cut -d ' ' -f 1 "$D/original-metadata.txt")
 case "$mode" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) exit 1;; esac
-label_tree() {
-    chown 201:0 "$A/bin/$dll"
-    chmod "$mode" "$A/bin/$dll"
-    chsmack -a "$label" "$A/bin/$dll"
-    find "$A/res/quiet-home" -type d -exec chmod 755 {} \;
-    find "$A/res/quiet-home" -type f -exec chmod 644 {} \;
-    find "$A/res/quiet-home" -exec chown 201:0 {} \;
-    find "$A/res/quiet-home" -exec chsmack -a "$label" {} \;
-}
-case "$action" in
-apply)
-    test ! -e "$U" || { echo "Update $update already exists; choose a new name" >&2; exit 1; }
-    test -s "$S/package.tar.gz"
-    test ! -e "$S/unpacked" || { echo "Remove $S/unpacked left by an earlier install first" >&2; exit 1; }
-    mkdir "$S/unpacked"
-    tar -xzf "$S/package.tar.gz" -C "$S/unpacked"
-    test -s "$S/unpacked/$dll" || { echo "The package has no $dll; build it with this TV's profile" >&2; exit 1; }
-    test -s "$S/unpacked/quiet-home/apps.json"
-    mkdir -p "$U"
-    if [ -e "$I" ]; then cp "$I" "$U/previous-update"; fi
-    cp -a "$A/bin/$dll" "$U/previous.dll"
-    cp "$D/installed-home.sha256" "$U/previous-installed-home.sha256"
-    app_launcher -u 5001 -k "$container" || true
-    mv "$A/res/quiet-home" "$U/previous-quiet-home"
-    cp -R "$S/unpacked/quiet-home" "$A/res/"
-    cp "$S/unpacked/$dll" "$A/bin/$dll"
-    label_tree
-    sha256sum "$A/bin/$dll" > "$D/installed-home.sha256"
-    cp "$D/installed-home.sha256" "$U/applied-installed-home.sha256"
-    echo "$update" > "$I"
-    rm -rf "$S/unpacked"
-    ;;
-rollback)
-    test -s "$U/previous.dll" || { echo "No update $update to roll back" >&2; exit 1; }
-    test -d "$U/previous-quiet-home"
-    test -s "$U/previous-installed-home.sha256"
-    test ! -e "$U/rolled-back-quiet-home" || { echo "Update $update was already rolled back" >&2; exit 1; }
-    # Only the latest update: rolling back an older one would drop the builds applied after it.
-    test "$(cat "$U/applied-installed-home.sha256")" = "$(cat "$D/installed-home.sha256")" || { echo "Update $update is not the installed one; roll back the later updates first" >&2; exit 1; }
-    # The digest alone cannot tell apart two updates with the same DLL.
-    if [ -e "$I" ]; then test "$(cat "$I")" = "$update" || { echo "Update $update is not the installed one; roll back the later updates first" >&2; exit 1; }; fi
-    app_launcher -u 5001 -k "$container" || true
-    mv "$A/res/quiet-home" "$U/rolled-back-quiet-home"
-    mv "$U/previous-quiet-home" "$A/res/quiet-home"
-    cp "$U/previous.dll" "$A/bin/$dll"
-    label_tree
-    cp "$U/previous-installed-home.sha256" "$D/installed-home.sha256"
-    sha256sum -c "$D/installed-home.sha256"
-    if [ -e "$U/previous-update" ]; then cp "$U/previous-update" "$I"; else rm -f "$I"; fi
-    ;;
-prune)
-    keep=$update
-    case "$keep" in ''|*[!0-9]*) exit 1;; esac
-    test "$keep" -ge 1 || { echo 'Keep at least the installed update' >&2; exit 1; }
-    test -s "$I" || { echo 'Prune only right after an apply' >&2; exit 1; }
-    # Walk down from the installed update and keep the first KEEP; every update not
-    # on that walk is either rolled back or older.
-    kept=' '
-    u=$(cat "$I")
-    test "$(cat "$D/updates/$u/applied-installed-home.sha256")" = "$(cat "$D/installed-home.sha256")" || { echo "Update $u is not installed" >&2; exit 1; }
-    n=0
-    while [ -n "$u" ] && [ -d "$D/updates/$u" ] && [ "$n" -lt "$keep" ]; do
-        test -s "$D/updates/$u/previous.dll" && test ! -e "$D/updates/$u/rolled-back-quiet-home" || { echo "Update $u cannot be rolled back; nothing removed" >&2; exit 1; }
-        kept="$kept$u "
-        n=$((n + 1))
-        if [ -e "$D/updates/$u/previous-update" ]; then
-            u=$(cat "$D/updates/$u/previous-update")
-            continue
-        fi
-        # An update from before installed-update: the one below applied the build it replaced.
-        previous=$(cat "$D/updates/$u/previous-installed-home.sha256")
-        u=
-        for path in "$D"/updates/*; do
-            c=${path##*/}
-            test -d "$path" && test ! -e "$path/rolled-back-quiet-home" || continue
-            case "$kept" in *" $c "*) continue;; esac
-            test "$(cat "$path/applied-installed-home.sha256" 2>/dev/null)" = "$previous" || continue
-            test -z "$u" || { echo "Updates $u and $c installed the same build; nothing removed" >&2; exit 1; }
-            u=$c
-        done
-    done
-    for path in "$D"/updates/*; do
-        c=${path##*/}
-        test -d "$path" || continue
-        case "$c" in *[!A-Za-z0-9_-]*) continue;; esac
-        case "$kept" in *" $c "*) continue;; esac
-        rm -rf "$path"
-        echo "Removed update $c"
-    done
-    echo "Kept updates:$kept"
-    exit 0
-    ;;
-*) echo "Unknown action $action" >&2; exit 1;;
-esac
+test -s "$S/package.tar.gz"
+mkdir "$T"
+# A normal error restores the previous files. SIGKILL or a lost session is recovered
+# by the next invocation, using the same fixed pending directory.
+trap 'status=$?; trap - 0 1 2 15; if ! recover; then echo "Recovery stopped; inspect $T" >&2; fi; exit "$status"' 0
+trap 'exit 1' 1 2 15
+mkdir "$T/package"
+tar -xzf "$S/package.tar.gz" -C "$T/package"
+test -s "$T/package/$dll"
+test -s "$T/package/quiet-home/apps.json"
+chown 201:0 "$T/package/$dll"
+chmod "$mode" "$T/package/$dll"
+chsmack -a "$label" "$T/package/$dll"
+find "$T/package/quiet-home" -type d -exec chmod 755 {} \;
+find "$T/package/quiet-home" -type f -exec chmod 644 {} \;
+find "$T/package/quiet-home" -exec chown 201:0 {} \;
+find "$T/package/quiet-home" -exec chsmack -a "$label" {} \;
+cp -a "$A/bin/$dll" "$T/old.dll"
+cp "$D/installed-home.sha256" "$T/old.sha256"
+printf '%s  %s\n' "$(digest "$T/package/$dll")" "$A/bin/$dll" > "$T/new.sha256"
+tree "$A/res/quiet-home" > "$T/old.resources"
+tree "$T/package/quiet-home" > "$T/new.resources"
+sha256sum -c "$D/installed-home.sha256"
+test "$(digest "$T/old.dll")" = "$(cut -d ' ' -f 1 "$T/old.sha256")"
+touch "$T/ready"
+app_launcher -u 5001 -k "$container" || true
+mv "$A/res/quiet-home" "$T/old-resources"
+mv "$T/package/quiet-home" "$A/res/quiet-home"
+mv "$T/package/$dll" "$A/bin/$dll"
+sha256sum -c "$T/new.sha256"
 app_launcher -u 5001 -s "$container"
-echo "Quiet Home $action complete ($update). The previous version is kept in $U"
+cp "$T/new.sha256" "$T/committed.sha256"
+touch "$T/commit"
+mv "$T/committed.sha256" "$D/installed-home.sha256"
+rm -f "$T/ready"
+rm -rf "$T"
+rm -f "$S/package.tar.gz"
+trap - 0 1 2 15
+echo 'Quiet Home updated. Original Samsung recovery files are in the installation snapshot.'

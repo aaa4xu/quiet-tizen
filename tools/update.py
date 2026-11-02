@@ -1,23 +1,17 @@
 #!/usr/bin/env python3
-"""Build Quiet Home and install it over the installed build on the owner's TV.
+"""Build and install Quiet Home, or install one saved local package.
 
-One run builds the launcher for the profile, packs .local/package/, uploads it,
-installs it with recipes/update-launcher.sh apply under a new name
-dev-YYYYMMDD-HHMMSS and takes the demo-mode frames with tools/screens.py.
-The name, snapshot and DLL digest go to .local/updates.log for a later rollback.
+  python3 tools/update.py --host 192.0.2.50 --sdb PATH/TO/sdb \\
+      --profile profiles/MODEL.json --snapshot home-01
 
-The run restarts Quiet Home and shows its demo pages over the picture, so run
-it only while the owner agrees. Quiet Home must already be installed from
-SNAPSHOT (recipes/install-launcher.sh).
-
-  python3 tools/update.py --host 10.0.0.5 --sdb PATH/TO/sdb \\
-      --profile profiles/MODEL.json --snapshot home-01 --compare .local/baseline/OLD
+After testing a build on the TV, copy .local/package.tar.gz to a working-package
+file under .local/. Use --package PATH to reinstall it without rebuilding.
+--compare DIR optionally compares demo frames, kept in .local/screens/update.
 """
 import argparse
-from datetime import datetime
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import tarfile
@@ -25,16 +19,10 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / ".local/package"
 ARCHIVE = ROOT / ".local/package.tar.gz"
-LOG = ROOT / ".local/updates.log"
-
-
-def update_name(now):
-    """Returns the update name for a run started at now; update-launcher.sh accepts only [A-Za-z0-9_-]."""
-    return now.strftime("dev-%Y%m%d-%H%M%S")
 
 
 def pack(source, archive):
-    """Packs the files of source into a gzip tar the way update-launcher.sh unpacks it, owned by root and without macOS metadata."""
+    """Pack a local build with root ownership and paths relative to the archive root."""
     def owned_by_root(info):
         info.uid = info.gid = 0
         info.uname = info.gname = ""
@@ -44,9 +32,21 @@ def pack(source, archive):
         package.add(source, arcname=".", filter=owned_by_root)
 
 
-def log_line(time, snapshot, name, digest, result):
-    """Returns one tab-separated line of .local/updates.log."""
-    return "\t".join((time.isoformat(timespec="seconds"), snapshot, name, digest, result)) + "\n"
+def check_package(archive, dll):
+    """Reject incomplete packages and entries that could escape the staging directory."""
+    with tarfile.open(archive, "r:gz") as package:
+        files = {}
+        for member in package.getmembers():
+            path = PurePosixPath(member.name)
+            if path.is_absolute() or ".." in path.parts or not (member.isdir() or member.isfile()):
+                raise ValueError(f"Unsafe package entry: {member.name}")
+            if path in files:
+                raise ValueError(f"Duplicate package entry: {member.name}")
+            files[path] = member
+        for required in (dll, "quiet-home/apps.json"):
+            member = files.get(PurePosixPath(required))
+            if member is None or not member.isfile() or member.size == 0:
+                raise ValueError(f"Package has no {required}; use the matching TV profile")
 
 
 def main():
@@ -54,45 +54,32 @@ def main():
     parser.add_argument("--host", required=True, help="The owner's TV IPv4 address")
     parser.add_argument("--sdb", help="Path to Samsung's separately installed SDB")
     parser.add_argument("--firmware", help="Software Version from About This TV, if the TV does not report it")
-    parser.add_argument("--profile", type=Path, required=True, help="TV profile whose launcher container holds Quiet Home")
+    parser.add_argument("--profile", type=Path, required=True, help="TV profile of the installed launcher")
     parser.add_argument("--snapshot", required=True, help="Snapshot Quiet Home was installed from")
-    parser.add_argument("--compare", type=Path, metavar="DIR", help="Compare the new frames with an earlier run's frames")
-    parser.add_argument("--keep", type=int, metavar="N",
-                        help="After the install, remove all but the newest N updates (update-launcher.sh prune)")
+    parser.add_argument("--package", type=Path, help="Install this saved package instead of building")
+    parser.add_argument("--compare", type=Path, metavar="DIR", help="Optionally compare demo frames with this directory")
     args = parser.parse_args()
-    if args.keep is not None and args.keep < 1:
-        parser.error("--keep must be at least 1: the installed update is always kept")
+    frames = ROOT / ".local/screens/update"
+    if args.compare and args.compare.resolve() == frames.resolve():
+        parser.error("--compare must differ from .local/screens/update")
     dll = json.loads(args.profile.read_text(encoding="utf-8"))["launcher"]["dll"]
-    started = datetime.now().astimezone()
-    name = update_name(started)
+    archive = args.package or ARCHIVE
+    if args.package is None:
+        subprocess.run([sys.executable, str(ROOT / "tools/build.py"), "launcher", "--profile", str(args.profile)], check=True)
+        pack(PACKAGE, archive)
+    check_package(archive, dll)
+    print(f"Package {archive}: {hashlib.sha256(archive.read_bytes()).hexdigest()}", flush=True)
     tv = [sys.executable, str(ROOT / "tools/tv.py"), "--host", args.host]
     if args.sdb:
         tv += ["--sdb", args.sdb]
     if args.firmware:
         tv += ["--firmware", args.firmware]
-    recipe = ["exec", "--script", str(ROOT / "recipes/update-launcher.sh")]
-
-    subprocess.run([sys.executable, str(ROOT / "tools/build.py"), "launcher", "--profile", str(args.profile)], check=True)
-    pack(PACKAGE, ARCHIVE)
-    digest = hashlib.sha256((PACKAGE / dll).read_bytes()).hexdigest()
-    print(f"Update {name}: {dll} {digest}", flush=True)
-    subprocess.run([*tv, "push", str(ARCHIVE), "package.tar.gz"], check=True)
-    applied = subprocess.run([*tv, *recipe, "--arg", "apply", "--arg", args.snapshot, "--arg", name]).returncode == 0
-    with LOG.open("a", encoding="utf-8") as log:
-        log.write(log_line(started, args.snapshot, name, digest, "applied" if applied else "apply-failed"))
-    if not applied:
-        sys.exit(f"Installing {name} failed. A failed script may have done part of its work: "
-                 f"inspect updates/{name} in the snapshot before retrying.")
-    if args.keep is not None:
-        subprocess.run([*tv, *recipe, "--arg", "prune", "--arg", args.snapshot, "--arg", str(args.keep)], check=True)
-    screens = [sys.executable, str(ROOT / "tools/screens.py"), *tv[2:], "--profile", str(args.profile),
-               "--out", str(ROOT / ".local/baseline" / name)]
+    subprocess.run([*tv, "push", str(archive), "package.tar.gz"], check=True)
+    subprocess.run([*tv, "exec", "--script", str(ROOT / "recipes/update-launcher.sh"),
+                    "--arg", "apply", "--arg", args.snapshot], check=True)
     if args.compare:
-        screens += ["--compare", str(args.compare)]
-    result = subprocess.run(screens).returncode
-    print(f"Roll back with: tools/tv.py ... exec --script recipes/update-launcher.sh "
-          f"--arg rollback --arg {args.snapshot} --arg {name}")
-    sys.exit(result)
+        subprocess.run([sys.executable, str(ROOT / "tools/screens.py"), *tv[2:],
+                        "--profile", str(args.profile), "--out", str(frames), "--compare", str(args.compare)], check=True)
 
 
 if __name__ == "__main__":
