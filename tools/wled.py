@@ -443,7 +443,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.action == "chase":
         sock_deadline = time.monotonic() + args.seconds
-        period = 1.0 / args.rate
+        period = 1.0 / args.rate if args.rate > 0 else 0.05
         head = 0
         seq = 0
         sent = 0
