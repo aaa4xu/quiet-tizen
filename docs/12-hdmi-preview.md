@@ -365,7 +365,7 @@ The decision is in the core and the TV calls are in the host, as
   opened an app from the catalog it asks for no preview until an input is
   opened through it. After one
   refused call it stops asking until the app restarts. The diagnostics file
-  ends with `preview=on|off|unsupported`. `Scenarios/PreviewScenarios` tests
+  includes `preview=on|off|unsupported`. `Scenarios/PreviewScenarios` tests
   this with the remote.
 - **Host.** `Platform/TizenInputPreview` waits until the card has settled,
   then calls `TvVideoPlane` (the only class that touches the TV service types;
@@ -426,6 +426,7 @@ Build against the TV's own assemblies and install the build as usual
 - The TV keeps the plane's size after the app; a crash between showing and
   hiding a preview can leave the picture small until Quiet Home shows and
   hides a preview again.
-- Do not build the preview from captured frames in the launcher:
-  `libvideo-capture.so` works from a root session, is a snapshot API at about
-  15–20 fps and is not part of the normal app path.
+- The input-card preview uses the TV's video plane directly.
+  `libvideo-capture.so` is used by `tools/frame.py` for snapshots and by the
+  separate [ambilight sender](04-launcher.md#ambilight-sender-on-the-tv) for
+  WLED colour sampling.

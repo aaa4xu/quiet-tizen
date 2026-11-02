@@ -5,9 +5,10 @@ TV has passed full boot, standby/wake, HDMI, sound and remote tests.
 Retain the first backups privately. Do not factory-reset first: that can
 remove useful recovery state without restoring all modified application files.
 
-The recipes are phased, not one atomic installer. A failed command can leave
-earlier changes in place. Inspect what completed before retrying. Never delete
-or overwrite the first original backup to make an installer run again.
+Cleanup, first installation and routing changes are separate phases. A failed
+command can leave earlier changes in place. Inspect what completed before
+retrying and retain the original recovery copies. Routine Quiet Home updates
+use temporary recovery state as described below.
 
 ## Restore cleanup flags
 
@@ -52,7 +53,36 @@ It restores the two selected routing fields from the saved semantic rows and
 the original QuickLaunch assembly/cache. If a vendor update changed the
 current routes, the guard stops for inspection.
 
+## Reinstall a working Quiet Home build
+
+Use the saved package for this TV with its matching profile and installation
+snapshot. The example uses the QE65S95F profile.
+
+```sh
+python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
+  --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01 \
+  --package .local/working-package.tar.gz
+```
+
+This uses the same update recipe as a new build and recovers any interrupted
+replacement first. The saved package contains binaries and resources. Theme
+and ambilight on/off preferences live separately in the container's data
+directory. See [Install a newer build](04-launcher.md#install-a-newer-build)
+for saving and replacing the working package.
+
+Samsung's original container and registry snapshots are independent of this
+custom package and legacy `updates/` history.
+
 ## Restore Samsung Home
+
+If an interrupted update left `update-pending/` in the installation snapshot,
+recover it before restoring Samsung Home. Recovery either restores the
+previous files or finishes a committed replacement. If checks find drift or
+a damaged temporary copy, recovery stops and retains it for inspection.
+
+```sh
+tv exec --script recipes/update-launcher.sh --arg recover --arg home-01
+```
 
 Read the original main-operation app, Home preference and startup preference
 from `operation-and-sources-before.txt` and `preferences-before.txt`.
@@ -81,12 +111,6 @@ from `.local/` instead of restoring a damaged one.
 It then removes Quiet Home's `res/quiet-home` from the container, so a new
 snapshot can back up the original container and Quiet Home can be installed
 again. Each install needs its own snapshot.
-
-To undo only a later Quiet Home build, roll that update back instead:
-`recipes/update-launcher.sh` with `rollback`, the snapshot and the update name.
-After `prune`, rollback goes back only as far as the oldest kept update; the
-removed ones are gone. Restoring Samsung's container with
-`restore-launcher.sh` does not depend on `updates/` and works after any prune.
 
 Allow temporary root cleanup to finish, then restart and test picture,
 sound, HDMI, Home, settings and remote. Restore only the optional cleanup

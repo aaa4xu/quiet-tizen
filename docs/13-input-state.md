@@ -29,9 +29,9 @@ port is shown only when the card's title is another name. Live TV keeps
 The input on screen gets no preview while it is in standby or without a
 signal: its card keeps the icon instead of a black rectangle.
 
-Quiet Home rereads the input list every 1.5 seconds while it is in front, and
+Quiet Home rereads the input list every 1.5 seconds while Home is in front, and
 the CEC devices on start, on resume and on the CEC service's notice. The
-diagnostics file's last line, `input_states=`, lists each card's state, for
+diagnostics file's `input_states=` line lists each card's state, for
 example `input_states=0:Unknown,14:Standby,15:On`.
 
 ## Signal: the source list's `powerState`

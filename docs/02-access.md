@@ -82,7 +82,8 @@ tv pull /absolute/path/on/tv .local/private-copy
 ```
 
 `push` is restricted to the SDK staging directory and verifies SHA-256.
-It leaves the staged file until explicitly removed. `pull` validates a
+It leaves the staged file until explicitly removed. The launcher update
+recipe removes its staged `package.tar.gz` after success. `pull` validates a
 compressed transfer and saves only under `.local/`. Its limit is 760,000
 compressed bytes and 32 MiB uncompressed, to stay within the upstream command
 output limit. Larger snapshots must be split or transferred with a separately
@@ -102,6 +103,9 @@ raw session JSON to public issues.
 
 Use one SDB/root operation at a time. If route detection selects the wrong
 interface, pass `--callback-host COMPUTER_LAN_IP` **before** the subcommand.
+If SDB lists the TV but the callback times out, check Developer Mode's Host
+PC IP and allow the incoming connection to the computer address printed by
+the helper.
 After reboot, a stale SDB server may need:
 
 ```sh

@@ -44,8 +44,9 @@ and license remain unchanged.
 
 The new `tools/tv.py` wrapper adds explicit model/firmware gating,
 private local storage, bounded checksum-verified file transfer and reviewed
-single-command execution. Those generalized conveniences were locally
-tested; they are not a claim of end-to-end testing on additional hardware.
+single-command execution. Offline checks cover those generalized helpers.
+The QE65S95F update check below also exercised the wrapper's identity checks,
+verified transfer and temporary-root execution on that build.
 
 ## Launcher and design
 
@@ -63,6 +64,19 @@ Publisher logos remain optional local downloads. High resolution was preferred
 over invented vectors for artwork such as the translucent Xbox mark. The
 download manifest is an attribution/source record, not a license grant.
 
+## Launcher update validation
+
+On 2026-11-02, the simplified updater reinstalled the existing Quiet Home
+package on a QE65S95FAUXRU running `T-RSMFDEUC-0090-1301.0`. The check covered
+package transfer, DLL/resource replacement, relaunch and matching content
+digests. A copy of that installed package was saved privately on the computer.
+Legacy custom-build history was removed after the check, and the original
+snapshot files still matched their pre-cleanup digests.
+
+Interruption recovery is checked on synthetic filesystems, including
+resource-only updates, repeated recovery and external changes. The original
+U8000F cleanup findings and S90F root-route report keep their separate scopes.
+
 ## What local validation establishes
 
 - Native launcher, bridge, Probe and root payload source compile with the
@@ -72,6 +86,8 @@ download manifest is an attribution/source record, not a license grant.
 - Catalog tests exercise navigation across page boundaries and malformed input.
 - Shell recipes receive syntax checks; selected SQL blocks are tested against
   synthetic tables.
+- Update tests interrupt file replacement and recovery, verify consistent
+  DLL/resource pairs and reject drift or damaged temporary copies.
 - Public files receive a review for accidental private/binary artifacts.
 
 These checks do not substitute for visual/controller verification, firmware

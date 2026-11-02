@@ -45,3 +45,7 @@ For Quiet Home's code:
 NUI changes also need a build against matching private references and a
 clearly stated hardware-test status. Keep attribution/license files with
 derived assets and code.
+
+For repeated TV builds, follow the [update workflow](docs/04-launcher.md#install-a-newer-build).
+Reuse the installation snapshot and keep one verified working package on
+the computer. Registry and routing changes have separate recovery snapshots.

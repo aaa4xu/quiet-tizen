@@ -46,11 +46,14 @@ Do not commit the resulting assemblies.
 python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
-This builds `BixbyPromotion.dll`, `QuickLaunch.dll` and `Probe.dll`, then
-assembles `.local/package/`. It also builds `Frame.dll` for `tools/frame.py`,
-which stays out of the package. For another documented model, add its profile, for
-example `--profile profiles/qe65s95fauxru-1301.0.json`; the profile's
-`launcher` block names the host package and the entry assembly to build.
+This builds `BixbyPromotion.dll`, `QuickLaunch.dll`, `Probe.dll` and the
+separate `AmbilightLoop.dll`, then assembles `.local/package/`. It also builds
+`Frame.dll` for `tools/frame.py`. For another documented model, pass its
+profile, for example `--profile profiles/qe65s95fauxru-1301.0.json`. The
+profile's `launcher` block names the host package and the entry assembly to
+build.
+The ambilight sender is packaged under `quiet-home/ambilight/`.
+`Frame.dll` stays in `.local/build/Frame/` for the capture tool.
 Public app cards are plain placeholders showing the app's name;
 [optional publisher artwork](06-artwork.md) can be fetched before rebuilding.
 
@@ -72,7 +75,7 @@ The line under each input's name also says whether its device is on:
 HDMI-CEC, or `HDMI 3 · No signal`. The signal comes from the source list's
 `powerState` and the standby from the TV's CEC service over D-Bus. The TV
 sends no notice for this, so Quiet Home rereads the list every 1.5 seconds
-while it is in front. See [the input-state findings](13-input-state.md).
+while the Home page is in front. See [the input-state findings](13-input-state.md).
 
 On the QE65S95F (`T-RSMFDEUC-0090-1301.0`) the call returned a JSON array
 allocated with `malloc`: Live TV (`sourceType` 0), a PlayStation 5 (14) and an
@@ -122,9 +125,6 @@ owner `201:0`. If the layout differs, stop and adapt the profile.
 
 ```sh
 tv exec --script recipes/snapshot.sh --arg home-01
-tar -czf .local/package.tar.gz -C .local/package .
-tv push .local/package.tar.gz package.tar.gz
-tv exec --script recipes/install-launcher.sh --arg home-01
 ```
 
 `tv exec --script` passes the matched profile's `launcher` block to every
@@ -141,13 +141,7 @@ Another profile can name a different host. The QE65S95F profile uses
 installed there; the archive is then `adplayer-original.tar.gz`. Use that app
 ID in the Home and startup commands.
 
-The recipe refuses to run unless that snapshot's copy still matches both its
-digest and the installed DLL. It then moves the cached native image out of the
-execution path, replaces the assembly with the original's file mode, installs
-resources, applies the package's observed SMACK label and requests a manual
-launch. It does not change Home/startup.
-
-Keep a second copy of the original container on the computer as well:
+Save a second copy of the original container on the computer before installation.
 
 ```sh
 tv pull /opt/usr/share/quiet-tizen-backups/home-01/bixby-promotion-original.tar.gz \
@@ -168,6 +162,21 @@ tv pull /opt/usr/share/quiet-tizen-backups/home-01/original-assembly.sha256 \
 tv pull /opt/usr/share/quiet-tizen-backups/home-01/original-metadata.txt \
   .local/home-01/original-metadata.txt
 ```
+
+Install the built package after the recovery copies are saved.
+
+```sh
+COPYFILE_DISABLE=1 tar -czf .local/package.tar.gz -C .local/package .
+tv push .local/package.tar.gz package.tar.gz
+tv exec --script recipes/install-launcher.sh --arg home-01
+```
+
+`COPYFILE_DISABLE=1` keeps macOS tar from adding `._` metadata entries.
+The recipe requires that the snapshot's copy match its recorded digest and
+the installed DLL. It moves the cached native image out of the execution
+path, replaces the assembly with the original's file mode, installs resources,
+applies the package's observed SMACK label and requests a launch. Home/startup
+assignment follows the visible checks below.
 
 The new release recipes are a generalized form of the operations used on the
 original TV. Filesystem steps are not a single atomic transaction. If a step
@@ -224,7 +233,8 @@ The README screenshots come from Quiet Home's demo mode. A launch with the
 extra `quiet_demo=1` shows the public catalog (packaged as
 `apps.public.json`), three sample inputs, fixed settings values and a 9:41
 clock. Settings and the theme changed during a demo stay in memory and change
-nothing on the TV; each demo starts from the same values. `quiet_theme=light|dark` picks a theme without saving it, and
+nothing on the TV. Entering demo mode initializes its quick settings and
+theme in memory. `quiet_theme=light|dark` picks a theme without saving it, and
 `quiet_page=home|apps|settings` a page, and `quiet_focus=toolbar` puts the focus
 on the page's first toolbar button; `quiet_ambilight=on|off` starts or stops the
 WLED sender (demo mode only changes its in-memory state). Any launch without
@@ -247,55 +257,83 @@ if a frame comes out black, for example when the screen turned off.
 
 ## Install a newer build
 
-A later build replaces the installed one without restoring Samsung's
-launcher first. Name the snapshot Quiet Home was installed from and give each
-update its own name:
+Updates use the snapshot Quiet Home was originally installed from. The recipe
+checks the container, installed DLL digest, native-image cache and original
+file metadata before replacing the DLL and resources. It keeps one temporary
+copy during replacement and removes it after success. Samsung's original
+container and registry snapshots stay in the installation snapshot.
+Use the profile and snapshot recorded for this TV. The examples below use
+the QE65S95F profile.
 
 ```sh
-COPYFILE_DISABLE=1 tar -czf .local/package.tar.gz -C .local/package .
-tv push .local/package.tar.gz package.tar.gz
-tv exec --script recipes/update-launcher.sh --arg apply --arg home-01 --arg visual-01
-tv exec --script recipes/update-launcher.sh --arg rollback --arg home-01 --arg visual-01
+python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
+  --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01
 ```
 
-`apply` refuses to run when the installed DLL no longer matches the
-snapshot's `installed-home.sha256`, for example after a vendor app update, or
-when a cached native image has returned. It keeps the previous DLL and
-resources in `updates/visual-01/` of the snapshot folder, installs the new
-build with the original's file mode and SMACK label, records the new digest
-and relaunches the container. Home and startup selectors are unchanged.
-
-`rollback` returns the build the update replaced, newest update first.
-`restore-launcher.sh` still restores Samsung's original container from the
-same snapshot after any number of updates. `COPYFILE_DISABLE=1` keeps macOS
-tar from adding `._` metadata files to the package.
-
-Every update keeps a full copy of the build it replaced. To free that space,
-remove old updates right after a successful `apply`:
+The command builds, packs, uploads and installs the launcher. A successful
+update removes the uploaded `package.tar.gz` from the TV's staging directory.
+After testing picture, sound, Home and remote operation on a freshly built
+update, preserve its archive as the working package for this TV.
 
 ```sh
-tv exec --script recipes/update-launcher.sh --arg prune --arg home-01 --arg 3
+cp .local/package.tar.gz .local/working-package.tar.gz
 ```
 
-`prune` keeps the installed update and the two below it, and removes every
-other update of the snapshot, rolled-back ones included. It never touches
-the installed build or Samsung's container in the snapshot. Rollback then
-goes back as far as the oldest kept update; `restore-launcher.sh` works as
-before.
-
-For a development loop, `tools/update.py` does all of this in one run: it
-builds the launcher for the profile, packs and uploads it, applies it as
-`dev-YYYYMMDD-HHMMSS`, optionally prunes (`--keep N`) and takes the demo
-frames with `tools/screens.py` into `.local/baseline/<name>`, comparing them
-with `--compare DIR` when given. The name, snapshot and DLL digest are
-appended to `.local/updates.log` for a later rollback. Like `screens.py`, it
-restarts Quiet Home and shows demo pages over the picture:
+Replace this saved package only after a newer build passes those checks.
+It includes the local catalog, artwork and ambilight configuration. Use
+`--package` to reinstall that archive directly.
 
 ```sh
 python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
   --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01 \
-  --keep 3 --compare .local/baseline/BUILD
+  --package .local/working-package.tar.gz
 ```
+
+When `--package` is used, its argument is the installed archive. The archive
+contains binaries and resources. Theme and ambilight on/off preferences live
+separately in the container's data directory.
+
+For a manually built package, create and upload the archive before running
+the update recipe.
+
+```sh
+COPYFILE_DISABLE=1 tar -czf .local/package.tar.gz -C .local/package .
+tv push .local/package.tar.gz package.tar.gz
+tv exec --script recipes/update-launcher.sh --arg apply --arg home-01
+```
+
+The former update names, `rollback`, `prune` and `--keep` are retired. Existing
+installation snapshots work with the new recipe. Legacy `updates/` folders
+can be removed separately after inspecting them and saving a working package.
+
+A normal installation error attempts to restore and relaunch the previous
+build. The command reports failure even if that recovery succeeds. If the
+process was killed or recovery could not finish, `update-pending/` retains
+the temporary copy. The next update recovers it before installing. Run
+`recover` to recover without installing another package.
+
+```sh
+tv exec --script recipes/update-launcher.sh --arg recover --arg home-01
+```
+
+Once replacement has started, recovery checks the DLL digests and resource
+contents. An external change or a damaged temporary copy stops recovery for
+inspection. An update already committed keeps its new files and finishes
+removing the temporary directory.
+Run recovery before restoring Samsung Home if `update-pending/` exists.
+
+`--compare DIR` optionally takes demo frames and compares them with that
+reference. New frames replace `.local/screens/update/`. Without `--compare`,
+the update command only builds and installs. Keep a chosen visual reference
+in `.local/baseline/current/`, separately from the saved working package.
+Capturing frames also needs `.local/build/Probe/Probe.dll`, produced by the
+launcher build. See [Develop on the TV](#develop-on-the-tv) for creating and
+replacing the reference.
+
+On 2026-11-02 the update path was exercised on a QE65S95FAUXRU running
+`T-RSMFDEUC-0090-1301.0` by reinstalling its existing package. Transfer,
+replacement, relaunch and matching DLL/resource digests were checked.
+Interruption recovery was exercised on synthetic filesystems.
 
 ## Make it open on Home and startup
 
@@ -379,7 +417,8 @@ Test both settings buttons, then generate/apply the **`light-shell`** cleanup
 group from the `shell-01` registry snapshot. That disables the native sidebar
 and browser. Keep the QuickLaunch bridge and `org.tizen.menu` enabled.
 
-Retain rollback files and remove only the known staged files after verification:
+Keep the installation and settings-bridge recovery snapshots. After verifying
+the installation and bridge, remove their known staging files.
 
 ```sh
 tv exec --command 'rm -f /home/owner/share/tmp/sdk_tools/quiet-tizen/package.tar.gz /home/owner/share/tmp/sdk_tools/quiet-tizen/Probe.dll; rm -rf /home/owner/share/tmp/sdk_tools/quiet-tizen/unpacked'
@@ -395,10 +434,12 @@ cache. Image loading is asynchronous, so a first launch still needs loading
 time; subsequent page visits avoid recreating image views.
 
 The clock updates every 30 seconds and stops while the launcher is paused.
-There is no always-running controller-poll loop. The 180 ms repeat filter
+Input-state polling runs every 1.5 seconds while the Home page is in front.
+The 180 ms repeat filter
 applies inside Quiet Home only; changing it cannot fix input lag inside Netflix.
-Local diagnostic files retain only current launcher state and are overwritten;
-the launcher has no telemetry/network client.
+The launcher state file is overwritten with its current state. The optional
+ambilight sender runs separately and streams colours to the configured WLED
+controller on the local network.
 
 ## Ambilight sender on the TV
 
@@ -413,11 +454,12 @@ and stops it; its label reads **Ambilight on** or **Ambilight off**. The sender
 is a separate process, so it keeps running while Quiet Home is in the background,
 for example while a streaming app or an input is on screen.
 
-Quiet Home starts the sender at boot when the owner left it on; the choice is
-kept in the container's data directory (`ambilight.state`). The app adds the
-SMACK rule that lets its label execute `/usr/bin/dotnet` before the first start;
-the rule is runtime state, so the app adds it again after every restart. No root
-session is needed. The sender writes its log to `/tmp/ambilight_loop.log`.
+When Quiet Home starts, it tries to start the sender if the saved preference
+in the container's data directory (`ambilight.state`) is on. On the tested
+build, the app adds the runtime SMACK rule that lets its label execute
+`/usr/bin/dotnet`. The rule is added again after a restart. The sender appends
+to `/tmp/ambilight_loop.log` after clearing that log at startup. The launcher
+port appends its diagnostics to `/tmp/quiet-home-ambilight.log`.
 
 `ambilight.json` holds the device-specific values:
 
@@ -439,15 +481,15 @@ can also set the state without the remote: `quiet_ambilight=on` or
 ## How the code is organized
 
 Quiet Home's source has two layers, and `launcher/tizen/Home.csproj`
-compiles both into the one entry assembly the profile names. The package
-layout does not change: one DLL and `res/quiet-home`.
+compiles both into the one entry assembly the profile names. Its resources
+live under `res/quiet-home`, including the separate ambilight sender assembly.
 
 - **`launcher/core`** (`QuietHome.Core`) holds the behaviour and has no
   Tizen references:
   - `HomeController` keeps the state (page, focus, inputs, catalog,
-    settings, theme, demo mode). It handles the app's life cycle and the
-    remote, acts through the ports and shows the result through the view
-    port. Errors become a notice on screen.
+    settings, theme, demo mode and ambilight status). It handles the app's
+    life cycle and the remote, acts through the ports and shows the result
+    through the view port. Errors become a notice on screen.
   - `Navigation/` moves the focus. `Navigator` turns a key into a
     `KeyOutcome`, and `KeyRepeatFilter` drops held-key repeats that come
     within 180 ms.
@@ -457,9 +499,9 @@ layout does not change: one DLL and `res/quiet-home`.
     implements.
   - `Platform/` holds the ports to the TV: `IInputSources`,
     `IQuickSettings`, `IThemeStore`, `IClock`, `ISystemLauncher`,
-    `IDiagnostics`, `IInputPreview` and `ICecDevices`, passed together as
-    `HomePorts`. `Platform/Demo/` holds the in-memory versions that demo
-    mode puts in front of them.
+    `IDiagnostics`, `IInputPreview`, `ICecDevices` and `IAmbilight`, passed
+    together as `HomePorts`. `Platform/Demo/` holds the in-memory versions that
+    demo mode puts in front of them.
   - `Actions/HomeAction` lists what Select on a card can do.
     `Settings/SettingsTile` is the table of Settings tiles, and
     `QuickSettingsState` holds the values read from the TV. `Catalog/`,
@@ -474,6 +516,7 @@ layout does not change: one DLL and `res/quiet-home`.
     preview and the mute with the TV service assemblies; `PreviewHole` in
     `Views/` cuts the see-through hole the picture shows in.
     `TizenCecDevices` asks the CEC service over D-Bus through `Interop/Gio`.
+    `TizenAmbilight` starts and stops the sender and saves its on/off preference.
   - `Views/` draws a `HomeScreen` with NUI. `HomeView` draws the chrome,
     focus and notice, and one view per page draws that page's content.
     `Layout` holds the coordinates and sizes, and `ArtworkCache` keeps app
@@ -562,12 +605,13 @@ checked only on the TV: by the demo frames and with the remote.
 
 ### The diagnostics file
 
-Quiet Home rewrites `/tmp/quiet-home-state.txt` after every event. The file
+Quiet Home records its current state in `/tmp/quiet-home-state.txt`. The file
 holds the page and focus, the last activity and key, the inputs, the catalog
 and artwork counters, the quick-setting values, `preview=` (`on`, `off` or
-`unsupported`) and, last, `input_states=` (each input card's source type and
-state, such as `14:Standby`). Its keys and their order are a contract for the
-recipes and tools that read it; new keys go at the end.
+`unsupported`), `input_states=` (each input card's source type and state, such
+as `14:Standby`) and, last, `ambilight=` (`on`, `off` or `unavailable`).
+Its keys and their order are a contract for the recipes and tools that read
+it. New keys go at the end.
 
 `build_ms` measures how long the view takes to build a page's NUI objects. It
 does not measure input-to-photon latency or the complete rendering time. It
@@ -581,19 +625,27 @@ Builds from before the input list moved behind `IInputSources` also counted
 
 ### Develop on the TV
 
-Build against the TV's framework once, then run one command per change in a
-window agreed with the owner:
+Build against the TV's framework, then capture a reference from the verified
+installed build in a window agreed with the owner.
+
+```sh
+python3 tools/screens.py --host "$TV_IP" --sdb "$SDB" \
+  --profile profiles/qe65s95fauxru-1301.0.json --out .local/baseline/current
+```
+
+Build and install subsequent changes with a frame comparison.
 
 ```sh
 python3 tools/update.py --host "$TV_IP" --sdb "$SDB" \
   --profile profiles/qe65s95fauxru-1301.0.json --snapshot home-01 \
-  --keep 3 --compare .local/baseline/PREVIOUS
+  --compare .local/baseline/current
 ```
 
 The demo frames (the three pages and a focused toolbar button, in both
 themes) are reproducible byte for byte. A change that should not
 alter what is drawn must therefore match the previous run's frames exactly. A
-visual change makes its own run the new baseline. Then check by hand with the
+visual change makes the comparison exit with a failure after the package has
+been installed. Inspect `.local/screens/update/` and check by hand with the
 remote what the frames do not show:
 
 - every page;
@@ -610,5 +662,14 @@ remote what the frames do not show:
 - the app shortcuts;
 - the Home and Settings keys.
 
-To undo the change, roll it back with the command the run prints (see
+Promote an intended visual change by copying the new frames into the
+reference directory.
+
+```sh
+cp -R .local/screens/update/. .local/baseline/current/
+```
+
+After a new build passes the TV checks, replace the saved working package
+using the command in [Install a newer build](#install-a-newer-build).
+To undo the change, reinstall the saved working package (see
 [Install a newer build](#install-a-newer-build)).

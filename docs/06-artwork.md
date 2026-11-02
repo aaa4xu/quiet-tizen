@@ -6,8 +6,8 @@ an app, create a subscription or install an Android APK.
 The example catalog includes Netflix, YouTube, Prime Video, HBO Max, Disney+,
 Hulu, Spotify, Apple TV, Tubi, Amazon Luna and Xbox. App IDs vary across regions,
 releases and packages. Match IDs against the current TV's metadata, then
-test each shortcut. The Home page's dock shows the catalog's first five apps,
-so order the entries accordingly.
+test each shortcut. The Home page's dock shows the first five non-utility
+apps followed by the "Your Apps" shortcut, so order the entries accordingly.
 
 Copy `launcher/assets/apps.json` to the ignored
 `launcher/assets/apps.local.json` to customize it. Entries contain a name,
@@ -71,7 +71,8 @@ retained memory, so keep only useful entries and use suitable source sizes.
 The current-state file reports pending/ready counts to help diagnose missing
 or unsupported resources.
 
-After adding artwork, rebuild and redeploy the resources using the same
-backup-first approach. Source changes need an assembly rebuild; catalog and
-asset changes alone do not. Stop the launcher before replacing resources,
-preserve ownership/SMACK labels, and restart it to reload the catalog.
+After adding artwork, use the [launcher update workflow](04-launcher.md#install-a-newer-build).
+The package carries the DLL together with its catalog and resources, and the
+recipe handles stopping the launcher, ownership, SMACK labels and relaunch.
+Keep the same installation snapshot and replace the saved working package
+after checking the new artwork on the TV.

@@ -42,6 +42,12 @@ gaming-hub helpers and TV Plus are optional features, not automatically malware.
    proof of persistence.
 8. Summarize actual evidence, limitations and how to undo the changes.
 
+Routine Quiet Home updates reuse the installation snapshot. Keep one package
+verified on that TV under `.local/` for reinstalling with
+`tools/update.py --package`. The update recipe keeps temporary recovery files
+only while replacing a build. Fresh registry/routing changes still need
+their own consistent snapshots and field-specific inverse operations.
+
 Run SDB/root sessions sequentially. Keep scripts below the 30-second command
 budget. A failed script may have completed earlier filesystem operations;
 inspect before retrying. Do not overwrite the first backup to make a retry
@@ -93,8 +99,10 @@ would change assemblies that must stay byte-identical.
 
 Use `.local/` for device-specific plans, raw command output, screenshots,
 snapshots, builds and extracted framework assemblies. Use the ignored
-`launcher/assets/app-icons/` and `apps.local.json` for downloaded publisher art
-and customized catalogs. These paths are not for public commits.
+`launcher/assets/app-icons/`, `launcher/assets/apps.local.json` and
+`launcher/assets/ambilight.local.json` for downloaded publisher art,
+customized catalogs and device-specific WLED settings. These paths and the
+saved working package under `.local/` are private.
 
 Before any public commit, inspect tracked files for credentials, network
 addresses, device/account identifiers, personal filesystem paths, screenshots,

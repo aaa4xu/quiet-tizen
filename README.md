@@ -61,6 +61,7 @@ cleanup compatibility.
 | [Cleanup planner](tools/plan_cleanup.py) | Field-specific apply/restore SQL generated from your own fresh snapshot |
 | [Access helper](tools/tv.py) | Explicit-target SDB preflight, temporary authenticated root, bounded transfers and session cleanup checks |
 | [Frame capture](tools/frame.py) | One PNG of what the TV shows, the UI laid over the HDMI or TV picture, for checks without a camera |
+| [Launcher updates](docs/04-launcher.md#install-a-newer-build) | Install a build or a saved working package, with temporary recovery state during file replacement |
 | [WLED helper](tools/wled.py) | Dependency-free strip control over the HTTP API, WebSocket live view and DDP/DRGB realtime senders |
 | [Ambilight sender](launcher/ambilight) | MAIN-plane capture to WLED over DDP, packaged with Quiet Home and started from its Home toolbar |
 | [Recipes](recipes) | Snapshot, stop-marker, launcher, settings-bridge and restoration scripts |
@@ -97,10 +98,11 @@ or other S90F firmware. Full reboot/standby and restoration validation were
 not part of this root-route report. See the [sanitized S90F evidence](evidence/s90f-root.json).
 
 On the U8000F, the native launcher and underlying techniques were exercised
-on the TV. The **generalized scripts in this public release were checked
-locally and compiled where applicable; they have not been replayed
-end-to-end on a second TV**. The S90F result above is limited to temporary
-root access; it does not validate those scripts there.
+on the TV. The complete generalized cleanup, installation and restoration
+procedure still needs end-to-end validation on additional TVs. Separate
+QE65S95F checks cover the source list, preview and
+[package update path](docs/04-launcher.md#install-a-newer-build). The S90F
+result above is limited to temporary root access.
 
 ## Walkthrough
 
@@ -135,7 +137,7 @@ Pillow, the .NET 6 SDK, OpenSSL and sqlite3, and uses an SDB kept at
 ```sh
 python3 -m unittest discover -s tests -v
 python3 tools/build.py payloads
-# After obtaining the four private Tizen reference assemblies:
+# After obtaining the six private Tizen reference assemblies:
 python3 tools/build.py launcher --framework .local/tv-framework
 ```
 
